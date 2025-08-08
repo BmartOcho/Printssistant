@@ -7,7 +7,7 @@ def make_duplex(input_path: Path, output_path: Path) -> None:
     reader = PdfReader(str(input_path))
     writer = PdfWriter()
     for page in reader.pages:
-        writer.add_page(page)    # front
+        writer.add_page(page)    # front (original page)
         writer.add_page(page)    # back (duplicate)
     with open(output_path, "wb") as f:
         writer.write(f)
