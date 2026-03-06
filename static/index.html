@@ -32,6 +32,7 @@
         </button>
         <button class="tab-btn" data-tool="evenodd">Even/Odd Gen</button>
         <button class="tab-btn" data-tool="cropper">Auto-Cropper</button>
+        <button class="tab-btn" data-tool="vectorizer">Vectorizer</button>
       </div>
 
       <section class="tool-card glass">
@@ -134,6 +135,21 @@
           >
             Generate Numbers
           </button>
+        </div>
+
+        <!-- Vectorizer Settings -->
+        <div id="tool-settings-vectorizer" class="settings-panel hidden">
+          <h3>Vectorizer Presets</h3>
+          <p class="settings-desc">
+            Select the preset to trace your raster image into scalable vector graphics.
+          </p>
+          <div class="input-group">
+            <label for="vectorizer-preset">Tracing Preset</label>
+            <select id="vectorizer-preset" class="glass-input">
+              <option value="laser_bw">Laser Engraving (standard)</option>
+              <option value="full_color">Full Color</option>
+            </select>
+          </div>
         </div>
 
         <!-- Main Upload Area -->

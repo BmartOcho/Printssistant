@@ -9,6 +9,8 @@ from duplexer import make_duplex
 from cropper_logic import process_auto_crop
 from insert_logic import insert_pages
 from even_odd_logic import generate_even_odd
+from vectorizer import engine as vectorizer_engine
+from presets import get_preset
 
 app = FastAPI(title="Printssistant API")
 
@@ -107,6 +109,37 @@ async def get_even_odd(
     result_string = generate_even_odd(start, end, is_even)
     
     return {"status": "success", "result": result_string}
+
+@app.post("/vectorize")
+async def vectorize_image(
+    file: UploadFile = File(...),
+    preset: str = Form("laser_bw")
+):
+    preset_config = get_preset(preset)
+    if not preset_config:
+        return {"status": "error", "message": f"Unknown preset: {preset}"}
+    
+    image_bytes = await file.read()
+    
+    try:
+        result = vectorizer_engine.vectorize(image_bytes, preset_config)
+        import time
+        timestamp = int(time.time())
+        basename = os.path.splitext(file.filename)[0]
+        svg_filename = f"{basename}_{preset}_{timestamp}.svg"
+        svg_path = PROCESSED_DIR / svg_filename
+        
+        with open(svg_path, "w", encoding="utf-8") as f:
+            f.write(result["svg"])
+            
+        return {
+            "status": "success", 
+            "filename": svg_filename,
+            "preview_bw": result.get("preview_bw"),
+            "stats": result.get("stats")
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 @app.get("/download/{filename}")
 async def download_file(filename: str):

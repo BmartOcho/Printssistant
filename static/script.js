@@ -18,6 +18,10 @@ const cropperSettings = document.getElementById('tool-settings-cropper');
 const cropperRows = document.getElementById('cropper-rows');
 const cropperCols = document.getElementById('cropper-cols');
 
+// Vectorizer UI
+const vectorizerSettings = document.getElementById('tool-settings-vectorizer');
+const vectorizerPreset = document.getElementById('vectorizer-preset');
+
 // Insert Specific UI
 const insertFileZone = document.getElementById('insert-file-zone');
 const insertFileInput = document.getElementById('insert-file-input');
@@ -52,8 +56,12 @@ function updateUIForTool() {
     insertSettings.classList.add('hidden');
     evenoddSettings.classList.add('hidden');
     cropperSettings.classList.add('hidden');
+    vectorizerSettings.classList.add('hidden');
     dropZone.classList.remove('hidden');
     stringResultContainer.classList.add('hidden');
+    
+    // Reset accept attribute
+    fileInput.accept = ".pdf";
     
     if (currentTool === 'duplexer') {
         dropTitle.innerText = "Drag & Drop PDF";
@@ -66,6 +74,11 @@ function updateUIForTool() {
         cropperSettings.classList.remove('hidden');
         dropTitle.innerText = "Drag & Drop PDF";
         dropDesc.innerText = "Upload the multi-page document to auto-crop";
+    } else if (currentTool === 'vectorizer') {
+        vectorizerSettings.classList.remove('hidden');
+        dropTitle.innerText = "Drag & Drop Image";
+        dropDesc.innerText = "Upload an image (PNG, JPG) to vectorize";
+        fileInput.accept = ".png,.jpg,.jpeg";
     } else if (currentTool === 'evenodd') {
         evenoddSettings.classList.remove('hidden');
         dropZone.classList.add('hidden');
@@ -106,8 +119,13 @@ fileInput.addEventListener('change', () => {
 });
 
 async function handleUpload(file) {
-    if (!file.name.endsWith('.pdf')) {
+    if (currentTool !== 'vectorizer' && !file.name.toLowerCase().endsWith('.pdf')) {
         alert('Please select a PDF file.');
+        return;
+    }
+    
+    if (currentTool === 'vectorizer' && !file.name.toLowerCase().match(/\.(jpg|jpeg|png)$/)) {
+        alert('Please select a PNG or JPG file for vectorization.');
         return;
     }
 
@@ -120,6 +138,7 @@ async function handleUpload(file) {
     dropZone.classList.add('hidden');
     insertSettings.classList.add('hidden');
     cropperSettings.classList.add('hidden');
+    vectorizerSettings.classList.add('hidden');
     progressContainer.classList.remove('hidden');
     statusText.innerText = `Processing ${file.name}...`;
     
@@ -150,6 +169,10 @@ async function handleUpload(file) {
         formData.append('rows', cropperRows.value);
         formData.append('cols', cropperCols.value);
         endpoint = '/crop';
+    } else if (currentTool === 'vectorizer') {
+        formData.append('file', file);
+        formData.append('preset', vectorizerPreset.value);
+        endpoint = '/vectorize';
     }
 
     try {
@@ -244,5 +267,7 @@ function resetUI() {
         insertSettings.classList.remove('hidden');
     } else if (currentTool === 'cropper') {
         cropperSettings.classList.remove('hidden');
+    } else if (currentTool === 'vectorizer') {
+        vectorizerSettings.classList.remove('hidden');
     }
 }
