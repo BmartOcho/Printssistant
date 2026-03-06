@@ -4,4 +4,3 @@ uvicorn
 python-multipart
 pymupdf
 numpy
-<truncated 14 bytes>
