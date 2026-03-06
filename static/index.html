@@ -28,6 +28,7 @@
       <div class="tool-selector glass">
         <button class="tab-btn active" data-tool="duplexer">Duplexer</button>
         <button class="tab-btn" data-tool="insertbetween">Insert Between</button>
+        <button class="tab-btn" data-tool="evenodd">Even/Odd Gen</button>
       </div>
 
       <section class="tool-card glass">
@@ -47,6 +48,32 @@
             </div>
         </div>
 
+        <!-- Even/Odd Generator Settings -->
+        <div id="tool-settings-evenodd" class="settings-panel hidden">
+            <h3>Generate Number Sequence</h3>
+            <p class="settings-desc">Generate a comma separated list of numbers for InDesign Parent Pages.</p>
+            
+            <div class="input-group" style="margin-bottom: 1rem;">
+                <label for="evenodd-type">Number Type</label>
+                <select id="evenodd-type" class="glass-input" style="width: 120px;">
+                    <option value="even">Even (2, 4, 6...)</option>
+                    <option value="odd">Odd (1, 3, 5...)</option>
+                </select>
+            </div>
+            
+            <div class="input-group" style="margin-bottom: 1rem;">
+                <label for="evenodd-start">Start Range</label>
+                <input type="number" id="evenodd-start" value="1" min="1" class="glass-input">
+            </div>
+            
+            <div class="input-group">
+                <label for="evenodd-end">End Range</label>
+                <input type="number" id="evenodd-end" value="10" min="1" class="glass-input">
+            </div>
+
+            <button id="evenodd-generate-btn" class="btn-primary" style="margin-top: 1.5rem; width: 100%;">Generate Numbers</button>
+        </div>
+
         <!-- Main Upload Area -->
         <div class="upload-area" id="drop-zone">
           <div class="icon">📄</div>
@@ -60,6 +87,12 @@
             <div class="progress-fill" id="progress-fill"></div>
           </div>
           <p id="status-text">Processing...</p>
+        </div>
+
+        <div id="string-result-container" class="hidden">
+            <h3 style="margin-bottom: 1rem;">Generated Numbers</h3>
+            <textarea id="string-result" class="glass-input" style="width: 100%; height: 100px; resize: none; text-align: left; padding: 1rem;" readonly></textarea>
+            <button id="copy-btn" class="btn-primary" style="margin-top: 1rem;">Copy to Clipboard</button>
         </div>
 
         <div id="result-container" class="hidden">

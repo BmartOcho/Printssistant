@@ -19,6 +19,16 @@ const insertFileInput = document.getElementById('insert-file-input');
 const insertFileName = document.getElementById('insert-file-name');
 const intervalInput = document.getElementById('interval-input');
 
+// EvenOdd UI
+const evenoddSettings = document.getElementById('tool-settings-evenodd');
+const evenoddStart = document.getElementById('evenodd-start');
+const evenoddEnd = document.getElementById('evenodd-end');
+const evenoddType = document.getElementById('evenodd-type');
+const stringResultContainer = document.getElementById('string-result-container');
+const stringResult = document.getElementById('string-result');
+const copyBtn = document.getElementById('copy-btn');
+const generateBtn = document.getElementById('evenodd-generate-btn');
+
 let currentTool = 'duplexer';
 let insertFile = null;
 
@@ -34,14 +44,21 @@ tabBtns.forEach(btn => {
 });
 
 function updateUIForTool() {
+    insertSettings.classList.add('hidden');
+    evenoddSettings.classList.add('hidden');
+    dropZone.classList.remove('hidden');
+    stringResultContainer.classList.add('hidden');
+    
     if (currentTool === 'duplexer') {
-        insertSettings.classList.add('hidden');
         dropTitle.innerText = "Drag & Drop PDF";
         dropDesc.innerText = "Standard Duplexing (Front/Back)";
     } else if (currentTool === 'insertbetween') {
         insertSettings.classList.remove('hidden');
         dropTitle.innerText = "Drag & Drop Main PDF";
         dropDesc.innerText = "Upload the multi-page document here";
+    } else if (currentTool === 'evenodd') {
+        evenoddSettings.classList.remove('hidden');
+        dropZone.classList.add('hidden');
     }
 }
 
@@ -149,10 +166,61 @@ async function handleUpload(file) {
 
 resetBtn.addEventListener('click', resetUI);
 
+// Handle EvenOdd Generate Button
+generateBtn.addEventListener('click', async () => {
+    const formData = new FormData();
+    formData.append('start', evenoddStart.value);
+    formData.append('end', evenoddEnd.value);
+    formData.append('type', evenoddType.value);
+
+    evenoddSettings.classList.add('hidden');
+    progressContainer.classList.remove('hidden');
+    statusText.innerText = `Generating Numbers...`;
+
+    try {
+        const response = await fetch('/evenodd', {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+        
+        progressContainer.classList.add('hidden');
+
+        if (data.status === 'success') {
+            stringResultContainer.classList.remove('hidden');
+            stringResult.value = data.result;
+        } else {
+            alert('Error generating numbers.');
+            resetUI();
+        }
+    } catch (err) {
+        alert('Failed to connect to server.');
+        resetUI();
+    }
+});
+
+// Handle Copy Array
+copyBtn.addEventListener('click', () => {
+    stringResult.select();
+    document.execCommand("copy");
+    copyBtn.innerText = "Copied!";
+    setTimeout(() => {
+        copyBtn.innerText = "Copy to Clipboard";
+    }, 2000);
+});
+
 function resetUI() {
     resultContainer.classList.add('hidden');
     progressContainer.classList.add('hidden');
-    dropZone.classList.remove('hidden');
+    stringResultContainer.classList.add('hidden');
+    
+    if (currentTool !== 'evenodd') {
+        dropZone.classList.remove('hidden');
+    } else {
+        evenoddSettings.classList.remove('hidden');
+    }
+    
     fileInput.value = '';
     progressFill.style.width = '0%';
     

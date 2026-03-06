@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse
 from duplexer import make_duplex
 from cropper_logic import process_auto_crop
 from insert_logic import insert_pages
+from even_odd_logic import generate_even_odd
 
 app = FastAPI(title="Print Productivity Hub API")
 
@@ -95,6 +96,17 @@ async def insert_pdf(
         return {"status": "success", "filename": output_filename}
     else:
         return {"status": "error", "message": "Failed to process PDF"}
+
+@app.post("/evenodd")
+async def get_even_odd(
+    start: int = Form(...),
+    end: int = Form(...),
+    type: str = Form(...)
+):
+    is_even = True if type == "even" else False
+    result_string = generate_even_odd(start, end, is_even)
+    
+    return {"status": "success", "result": result_string}
 
 @app.get("/download/{filename}")
 async def download_file(filename: str):
