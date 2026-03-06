@@ -10,7 +10,7 @@ from cropper_logic import process_auto_crop
 from insert_logic import insert_pages
 from even_odd_logic import generate_even_odd
 
-app = FastAPI(title="Print Productivity Hub API")
+app = FastAPI(title="Printssistant API")
 
 # Setup directories
 import tempfile
