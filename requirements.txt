@@ -4,7 +4,7 @@ uvicorn
 python-multipart
 pymupdf
 numpy
-opencv-python>=4.8.0
+opencv-python-headless>=4.8.0
 Pillow>=10.0.0
 potracer>=0.0.4
 scikit-image>=0.21.0
