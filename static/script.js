@@ -13,6 +13,11 @@ const insertSettings = document.getElementById('tool-settings-insert');
 const dropTitle = document.getElementById('drop-title');
 const dropDesc = document.getElementById('drop-desc');
 
+// Cropper UI
+const cropperSettings = document.getElementById('tool-settings-cropper');
+const cropperRows = document.getElementById('cropper-rows');
+const cropperCols = document.getElementById('cropper-cols');
+
 // Insert Specific UI
 const insertFileZone = document.getElementById('insert-file-zone');
 const insertFileInput = document.getElementById('insert-file-input');
@@ -46,6 +51,7 @@ tabBtns.forEach(btn => {
 function updateUIForTool() {
     insertSettings.classList.add('hidden');
     evenoddSettings.classList.add('hidden');
+    cropperSettings.classList.add('hidden');
     dropZone.classList.remove('hidden');
     stringResultContainer.classList.add('hidden');
     
@@ -56,6 +62,10 @@ function updateUIForTool() {
         insertSettings.classList.remove('hidden');
         dropTitle.innerText = "Drag & Drop Main PDF";
         dropDesc.innerText = "Upload the multi-page document here";
+    } else if (currentTool === 'cropper') {
+        cropperSettings.classList.remove('hidden');
+        dropTitle.innerText = "Drag & Drop PDF";
+        dropDesc.innerText = "Upload the multi-page document to auto-crop";
     } else if (currentTool === 'evenodd') {
         evenoddSettings.classList.remove('hidden');
         dropZone.classList.add('hidden');
@@ -109,6 +119,7 @@ async function handleUpload(file) {
     // UI Updates
     dropZone.classList.add('hidden');
     insertSettings.classList.add('hidden');
+    cropperSettings.classList.add('hidden');
     progressContainer.classList.remove('hidden');
     statusText.innerText = `Processing ${file.name}...`;
     
@@ -134,6 +145,11 @@ async function handleUpload(file) {
         formData.append('insert_file', insertFile);
         formData.append('interval', intervalInput.value);
         endpoint = '/insert';
+    } else if (currentTool === 'cropper') {
+        formData.append('file', file);
+        formData.append('rows', cropperRows.value);
+        formData.append('cols', cropperCols.value);
+        endpoint = '/crop';
     }
 
     try {
@@ -226,5 +242,7 @@ function resetUI() {
     
     if (currentTool === 'insertbetween') {
         insertSettings.classList.remove('hidden');
+    } else if (currentTool === 'cropper') {
+        cropperSettings.classList.remove('hidden');
     }
 }

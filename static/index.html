@@ -27,51 +27,113 @@
 
       <div class="tool-selector glass">
         <button class="tab-btn active" data-tool="duplexer">Duplexer</button>
-        <button class="tab-btn" data-tool="insertbetween">Insert Between</button>
+        <button class="tab-btn" data-tool="insertbetween">
+          Insert Between
+        </button>
         <button class="tab-btn" data-tool="evenodd">Even/Odd Gen</button>
+        <button class="tab-btn" data-tool="cropper">Auto-Cropper</button>
       </div>
 
       <section class="tool-card glass">
-        
         <!-- Tool Specific Settings -->
         <div id="tool-settings-insert" class="settings-panel hidden">
-            <h3>Insert Options</h3>
-            <p class="settings-desc">Upload the Single Page PDF to insert between the pages of your main document.</p>
-            <div class="upload-area sub-upload" id="insert-file-zone">
-                <p>Drag & Drop Insert PDF</p>
-                <input type="file" id="insert-file-input" hidden accept=".pdf" />
-                <span id="insert-file-name" class="file-name"></span>
-            </div>
-            <div class="input-group">
-                <label for="interval-input">Interval (Pages)</label>
-                <input type="number" id="interval-input" value="1" min="1" class="glass-input">
-            </div>
+          <h3>Insert Options</h3>
+          <p class="settings-desc">
+            Upload the Single Page PDF to insert between the pages of your main
+            document.
+          </p>
+          <div class="upload-area sub-upload" id="insert-file-zone">
+            <p>Drag & Drop Insert PDF</p>
+            <input type="file" id="insert-file-input" hidden accept=".pdf" />
+            <span id="insert-file-name" class="file-name"></span>
+          </div>
+          <div class="input-group">
+            <label for="interval-input">Interval (Pages)</label>
+            <input
+              type="number"
+              id="interval-input"
+              value="1"
+              min="1"
+              class="glass-input"
+            />
+          </div>
+        </div>
+
+        <!-- Auto-Cropper Settings -->
+        <div id="tool-settings-cropper" class="settings-panel hidden">
+          <h3>Crop Settings</h3>
+          <p class="settings-desc">
+            Specify how many rows and columns to split each page into.
+          </p>
+
+          <div class="input-group" style="margin-bottom: 1rem">
+            <label for="cropper-rows">Rows</label>
+            <input
+              type="number"
+              id="cropper-rows"
+              value="2"
+              min="1"
+              class="glass-input"
+            />
+          </div>
+
+          <div class="input-group">
+            <label for="cropper-cols">Columns</label>
+            <input
+              type="number"
+              id="cropper-cols"
+              value="2"
+              min="1"
+              class="glass-input"
+            />
+          </div>
         </div>
 
         <!-- Even/Odd Generator Settings -->
         <div id="tool-settings-evenodd" class="settings-panel hidden">
-            <h3>Generate Number Sequence</h3>
-            <p class="settings-desc">Generate a comma separated list of numbers for InDesign Parent Pages.</p>
-            
-            <div class="input-group" style="margin-bottom: 1rem;">
-                <label for="evenodd-type">Number Type</label>
-                <select id="evenodd-type" class="glass-input" style="width: 120px;">
-                    <option value="even">Even (2, 4, 6...)</option>
-                    <option value="odd">Odd (1, 3, 5...)</option>
-                </select>
-            </div>
-            
-            <div class="input-group" style="margin-bottom: 1rem;">
-                <label for="evenodd-start">Start Range</label>
-                <input type="number" id="evenodd-start" value="1" min="1" class="glass-input">
-            </div>
-            
-            <div class="input-group">
-                <label for="evenodd-end">End Range</label>
-                <input type="number" id="evenodd-end" value="10" min="1" class="glass-input">
-            </div>
+          <h3>Generate Number Sequence</h3>
+          <p class="settings-desc">
+            Generate a comma separated list of numbers for InDesign Parent
+            Pages.
+          </p>
 
-            <button id="evenodd-generate-btn" class="btn-primary" style="margin-top: 1.5rem; width: 100%;">Generate Numbers</button>
+          <div class="input-group" style="margin-bottom: 1rem">
+            <label for="evenodd-type">Number Type</label>
+            <select id="evenodd-type" class="glass-input" style="width: 120px">
+              <option value="even">Even (2, 4, 6...)</option>
+              <option value="odd">Odd (1, 3, 5...)</option>
+            </select>
+          </div>
+
+          <div class="input-group" style="margin-bottom: 1rem">
+            <label for="evenodd-start">Start Range</label>
+            <input
+              type="number"
+              id="evenodd-start"
+              value="1"
+              min="1"
+              class="glass-input"
+            />
+          </div>
+
+          <div class="input-group">
+            <label for="evenodd-end">End Range</label>
+            <input
+              type="number"
+              id="evenodd-end"
+              value="10"
+              min="1"
+              class="glass-input"
+            />
+          </div>
+
+          <button
+            id="evenodd-generate-btn"
+            class="btn-primary"
+            style="margin-top: 1.5rem; width: 100%"
+          >
+            Generate Numbers
+          </button>
         </div>
 
         <!-- Main Upload Area -->
@@ -90,17 +152,28 @@
         </div>
 
         <div id="string-result-container" class="hidden">
-            <h3 style="margin-bottom: 1rem;">Generated Numbers</h3>
-            <textarea id="string-result" class="glass-input" style="width: 100%; height: 100px; resize: none; text-align: left; padding: 1rem;" readonly></textarea>
-            <button id="copy-btn" class="btn-primary" style="margin-top: 1rem;">Copy to Clipboard</button>
+          <h3 style="margin-bottom: 1rem">Generated Numbers</h3>
+          <textarea
+            id="string-result"
+            class="glass-input"
+            style="
+              width: 100%;
+              height: 100px;
+              resize: none;
+              text-align: left;
+              padding: 1rem;
+            "
+            readonly
+          ></textarea>
+          <button id="copy-btn" class="btn-primary" style="margin-top: 1rem">
+            Copy to Clipboard
+          </button>
         </div>
 
         <div id="result-container" class="hidden">
           <div class="success-icon">✔</div>
           <h3>File Ready!</h3>
-          <a href="#" id="download-link" class="btn-primary"
-            >Download Result</a
-          >
+          <a href="#" id="download-link" class="btn-primary">Download Result</a>
           <button id="reset-btn" class="btn-secondary">Process Another</button>
         </div>
       </section>
