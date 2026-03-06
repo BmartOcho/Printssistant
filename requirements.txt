@@ -1,0 +1,7 @@
+PyPDF2>=3.0.0
+fastapi[all]
+uvicorn
+python-multipart
+pymupdf
+numpy
+<truncated 14 bytes>

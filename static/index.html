@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Duplexer | Print Tools</title>
+    <link rel="stylesheet" href="static/style.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="background-blobs">
+      <div class="blob blob-1"></div>
+      <div class="blob blob-2"></div>
+      <div class="blob blob-3"></div>
+    </div>
+
+    <main>
+      <header>
+        <h1>Duplexer<span>.</span></h1>
+        <p>Smart PDF Duplication for Print Workflows</p>
+      </header>
+
+      <section class="tool-card glass">
+        <div class="upload-area" id="drop-zone">
+          <div class="icon">📄</div>
+          <h2>Drag & Drop PDF</h2>
+          <p>or click to browse files</p>
+          <input type="file" id="file-input" hidden accept=".pdf" />
+        </div>
+
+        <div id="progress-container" class="hidden">
+          <div class="progress-bar">
+            <div class="progress-fill" id="progress-fill"></div>
+          </div>
+          <p id="status-text">Processing...</p>
+        </div>
+
+        <div id="result-container" class="hidden">
+          <div class="success-icon">✔</div>
+          <h3>File Ready!</h3>
+          <a href="#" id="download-link" class="btn-primary"
+            >Download Duplexed PDF</a
+          >
+          <button id="reset-btn" class="btn-secondary">Process Another</button>
+        </div>
+      </section>
+
+      <footer>
+        <p>&copy; 2026 Print Productivity Hub | Designed by Antigravity</p>
+      </footer>
+    </main>
+
+    <script src="static/script.js"></script>
+  </body>
+</html>

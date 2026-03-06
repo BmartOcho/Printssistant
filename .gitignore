@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+env/
+build/
+dist/
+*.spec
+
+# PDF Files (User input/output)
+Add_PDF/
+_Test Files/
+*.pdf
+
+# IDEs
+.vscode/
+.idea/
