@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Duplexer | Print Tools</title>
+    <title>Print Hub | Professional Printing Utilities</title>
     <link rel="stylesheet" href="static/style.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -21,15 +21,37 @@
 
     <main>
       <header>
-        <h1>Duplexer<span>.</span></h1>
-        <p>Smart PDF Duplication for Print Workflows</p>
+        <h1>Print Hub<span>.</span></h1>
+        <p>Professional Utilities for Modern Printing</p>
       </header>
 
+      <div class="tool-selector glass">
+        <button class="tab-btn active" data-tool="duplexer">Duplexer</button>
+        <button class="tab-btn" data-tool="insertbetween">Insert Between</button>
+      </div>
+
       <section class="tool-card glass">
+        
+        <!-- Tool Specific Settings -->
+        <div id="tool-settings-insert" class="settings-panel hidden">
+            <h3>Insert Options</h3>
+            <p class="settings-desc">Upload the Single Page PDF to insert between the pages of your main document.</p>
+            <div class="upload-area sub-upload" id="insert-file-zone">
+                <p>Drag & Drop Insert PDF</p>
+                <input type="file" id="insert-file-input" hidden accept=".pdf" />
+                <span id="insert-file-name" class="file-name"></span>
+            </div>
+            <div class="input-group">
+                <label for="interval-input">Interval (Pages)</label>
+                <input type="number" id="interval-input" value="1" min="1" class="glass-input">
+            </div>
+        </div>
+
+        <!-- Main Upload Area -->
         <div class="upload-area" id="drop-zone">
           <div class="icon">📄</div>
-          <h2>Drag & Drop PDF</h2>
-          <p>or click to browse files</p>
+          <h2 id="drop-title">Drag & Drop PDF</h2>
+          <p id="drop-desc">Standard Duplexing (Front/Back)</p>
           <input type="file" id="file-input" hidden accept=".pdf" />
         </div>
 
@@ -44,14 +66,14 @@
           <div class="success-icon">✔</div>
           <h3>File Ready!</h3>
           <a href="#" id="download-link" class="btn-primary"
-            >Download Duplexed PDF</a
+            >Download Result</a
           >
           <button id="reset-btn" class="btn-secondary">Process Another</button>
         </div>
       </section>
 
       <footer>
-        <p>&copy; 2026 Print Productivity Hub | Designed by Antigravity</p>
+        <p>&copy; 2026 Print Productivity Hub</p>
       </footer>
     </main>
 

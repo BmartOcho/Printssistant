@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from duplexer import make_duplex
 from cropper_logic import process_auto_crop
+from insert_logic import insert_pages
 
 app = FastAPI(title="Print Productivity Hub API")
 
@@ -70,6 +71,30 @@ async def crop_pdf(
         return {"status": "success", "filename": zip_filename}
     
     return {"status": "success", "filename": cropped_files[0]}
+
+@app.post("/insert")
+async def insert_pdf(
+    base_file: UploadFile = File(...),
+    insert_file: UploadFile = File(...),
+    interval: int = Form(...)
+):
+    base_path = UPLOAD_DIR / base_file.filename
+    with open(base_path, "wb") as buffer:
+        shutil.copyfileobj(base_file.file, buffer)
+        
+    insert_path = UPLOAD_DIR / insert_file.filename
+    with open(insert_path, "wb") as buffer:
+        shutil.copyfileobj(insert_file.file, buffer)
+        
+    output_filename = f"inserted_{base_file.filename}"
+    output_path = PROCESSED_DIR / output_filename
+    
+    success = insert_pages(base_path, insert_path, output_path, interval=interval, positions=[])
+    
+    if success:
+        return {"status": "success", "filename": output_filename}
+    else:
+        return {"status": "error", "message": "Failed to process PDF"}
 
 @app.get("/download/{filename}")
 async def download_file(filename: str):
