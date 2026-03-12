@@ -30,8 +30,6 @@ class VectorizerEngine:
     def __init__(self):
         self.last_preprocessed = None
         self.last_thresholded = None
-        self._has_alpha = False
-        self._content_is_light = False
 
     def vectorize(self, image_bytes, preset, custom_overrides=None):
         """
@@ -63,7 +61,7 @@ class VectorizerEngine:
         start_time = time.time()
 
         # 1. Load image (handles alpha/transparency)
-        img = self._load_image(image_bytes)
+        img, has_alpha, content_is_light = self._load_image(image_bytes)
         original_h, original_w = img.shape[:2]
 
         # 2. Preprocess
@@ -77,7 +75,7 @@ class VectorizerEngine:
         invert_setting = config["preprocessing"].get("invert", False)
         should_invert = False
         if invert_setting == "auto":
-            should_invert = self._has_alpha and self._content_is_light
+            should_invert = has_alpha and content_is_light
             if should_invert:
                 logger.info("Auto-invert: detected light content on transparent background")
         elif invert_setting:
@@ -106,7 +104,7 @@ class VectorizerEngine:
         stats["image_width"] = original_w
         stats["image_height"] = original_h
         stats["engine"] = "potrace" if HAS_POTRACE else "opencv"
-        stats["has_transparency"] = self._has_alpha
+        stats["has_transparency"] = has_alpha
         stats["auto_inverted"] = should_invert and invert_setting == "auto"
         stats["mode"] = "bw"
 
@@ -125,7 +123,7 @@ class VectorizerEngine:
         start_time = time.time()
 
         # 1. Load image
-        img = self._load_image(image_bytes)
+        img, has_alpha, _ = self._load_image(image_bytes)
         original_h, original_w = img.shape[:2]
 
         # 2. Light preprocessing (preserve colors, just reduce noise)
@@ -188,7 +186,7 @@ class VectorizerEngine:
             "point_count": total_points,
             "color_count": len(colors),
             "engine": "potrace" if HAS_POTRACE else "opencv",
-            "has_transparency": self._has_alpha,
+            "has_transparency": has_alpha,
             "auto_inverted": False,
             "mode": "color",
         }
@@ -399,7 +397,11 @@ class VectorizerEngine:
     # ═══════════════════════════════════════════════════════════════════
 
     def _load_image(self, image_bytes):
-        """Load image from bytes into OpenCV format, handling alpha/transparency."""
+        """Load image from bytes into OpenCV format, handling alpha/transparency.
+
+        Returns:
+            (img, has_alpha, content_is_light) — all call-local, never stored on self.
+        """
         nparr = np.frombuffer(image_bytes, np.uint8)
 
         img = cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED)
@@ -408,7 +410,7 @@ class VectorizerEngine:
 
         # Check if image has an alpha channel
         if len(img.shape) == 3 and img.shape[2] == 4:
-            self._has_alpha = True
+            has_alpha = True
             logger.info("Detected alpha channel (transparent image)")
 
             alpha = img[:, :, 3]
@@ -419,18 +421,18 @@ class VectorizerEngine:
             if opaque_mask.any():
                 gray_full = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
                 opaque_brightness = gray_full[opaque_mask].mean()
-                self._content_is_light = opaque_brightness > 170
+                content_is_light = opaque_brightness > 170
                 logger.info(
                     f"Content brightness: {opaque_brightness:.0f}/255 "
-                    f"({'light' if self._content_is_light else 'dark'})"
+                    f"({'light' if content_is_light else 'dark'})"
                 )
             else:
-                self._content_is_light = False
+                content_is_light = False
 
             # Composite onto contrasting background
             alpha_f = alpha.astype(np.float32) / 255.0
             alpha_3ch = np.stack([alpha_f] * 3, axis=-1)
-            if self._content_is_light:
+            if content_is_light:
                 bg_color = 0
                 logger.info("Compositing onto BLACK background (light content)")
             else:
@@ -441,12 +443,12 @@ class VectorizerEngine:
                          solid_bg.astype(np.float32) * (1 - alpha_3ch))
             img = composited.astype(np.uint8)
         else:
-            self._has_alpha = False
-            self._content_is_light = False
+            has_alpha = False
+            content_is_light = False
             if len(img.shape) == 2:
                 img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
 
-        return img
+        return img, has_alpha, content_is_light
 
     # ═══════════════════════════════════════════════════════════════════
     #  SHARED: Preprocessing
@@ -766,14 +768,14 @@ class VectorizerEngine:
     def get_preview(self, image_bytes, preset, custom_overrides=None):
         """Generate only the B&W threshold preview (faster than full vectorization)."""
         config = self._merge_config(preset, custom_overrides)
-        img = self._load_image(image_bytes)
+        img, has_alpha, content_is_light = self._load_image(image_bytes)
         processed = self._preprocess(img, config["preprocessing"])
         binary = self._threshold(processed, config["threshold"])
 
         invert_setting = config["preprocessing"].get("invert", False)
         should_invert = False
         if invert_setting == "auto":
-            should_invert = self._has_alpha and self._content_is_light
+            should_invert = has_alpha and content_is_light
         elif invert_setting:
             should_invert = True
 
