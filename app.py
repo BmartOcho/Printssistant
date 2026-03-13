@@ -2,6 +2,7 @@ import os
 import shutil
 import zipfile
 from pathlib import Path
+from typing import Optional
 from fastapi import FastAPI, UploadFile, File, BackgroundTasks, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -11,6 +12,7 @@ from insert_logic import insert_pages
 from even_odd_logic import generate_even_odd
 from vectorizer import engine as vectorizer_engine
 from presets import get_preset
+from swatchset_logic import generate_swatchset
 
 app = FastAPI(title="Printssistant API")
 
@@ -140,6 +142,47 @@ async def vectorize_image(
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+@app.post("/swatchset")
+async def create_swatchset(
+    base_c: int = Form(...),
+    base_m: int = Form(...),
+    base_y: int = Form(...),
+    base_k: int = Form(...),
+    goal_type: str = Form(...),
+    goal_r: int = Form(0),
+    goal_g: int = Form(0),
+    goal_b: int = Form(0),
+    goal_hex: str = Form(""),
+    goal_pantone: str = Form(""),
+    output_format: str = Form("pdf"),
+    reference_image: Optional[UploadFile] = File(None)
+):
+    import time
+    ref_bytes = None
+    if reference_image and reference_image.filename:
+        ref_bytes = await reference_image.read()
+
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    ext = "eps" if output_format == "eps" else "pdf"
+    output_path = PROCESSED_DIR / f"swatchset_{timestamp}.{ext}"
+
+    success = generate_swatchset(
+        output_path=output_path,
+        base_c=base_c, base_m=base_m, base_y=base_y, base_k=base_k,
+        goal_type=goal_type,
+        goal_r=goal_r, goal_g=goal_g, goal_b=goal_b,
+        goal_hex=goal_hex,
+        goal_pantone=goal_pantone,
+        reference_image_bytes=ref_bytes,
+        output_format=output_format,
+    )
+
+    if success:
+        return {"status": "success", "filename": output_path.name}
+    fmt_label = "EPS" if output_format == "eps" else "PDF"
+    return {"status": "error", "message": f"Failed to generate swatch set {fmt_label}"}
+
 
 @app.get("/download/{filename}")
 async def download_file(filename: str):

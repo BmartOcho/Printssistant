@@ -323,3 +323,59 @@ select.glass-input {
     font-size: 0.9rem;
   }
 }
+
+
+/* ── Swatch Set Creator ──────────────────────────────────────────────── */
+.swatchset-subhead {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  margin-top: 0;
+  opacity: 0.9;
+}
+
+.swatchset-cmyk-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.swatchset-cmyk-field {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.swatchset-cmyk-field label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  opacity: 0.8;
+  letter-spacing: 0.05em;
+}
+
+.swatchset-num {
+  width: 60px !important;
+  text-align: center;
+}
+
+.swatchset-radio-row {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.swatchset-radio-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.swatchset-radio-label input[type="radio"] {
+  accent-color: var(--primary);
+  cursor: pointer;
+}
