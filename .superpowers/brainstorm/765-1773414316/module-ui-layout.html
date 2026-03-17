@@ -1,0 +1,86 @@
+<h2>Swatch Set Creator — Module UI Layout</h2>
+<p class="subtitle">Two layout options for the input panel. Which feels right for your workflow?</p>
+
+<div class="cards">
+
+  <!-- Option A: Vertical stack -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0f172a; padding:16px; border-radius:6px; font-family:sans-serif;">
+      <div style="color:#a78bfa; font-size:11px; font-weight:600; letter-spacing:1px; margin-bottom:10px;">SWATCH SET CREATOR</div>
+
+      <div style="background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12); border-radius:6px; padding:10px; margin-bottom:8px;">
+        <div style="color:#94a3b8; font-size:10px; margin-bottom:6px;">BASELINE (ORIGINAL SWATCH)</div>
+        <div style="display:flex; gap:6px; margin-bottom:6px;">
+          <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:4px 8px; color:#f8fafc; font-size:11px; flex:1; text-align:center;">C: <span style="color:#60a5fa">45</span></div>
+          <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:4px 8px; color:#f8fafc; font-size:11px; flex:1; text-align:center;">M: <span style="color:#f472b6">30</span></div>
+          <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:4px 8px; color:#f8fafc; font-size:11px; flex:1; text-align:center;">Y: <span style="color:#facc15">0</span></div>
+          <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:4px 8px; color:#f8fafc; font-size:11px; flex:1; text-align:center;">K: <span style="color:#94a3b8">10</span></div>
+        </div>
+        <div style="background:rgba(255,255,255,0.05); border:1px dashed rgba(255,255,255,0.15); border-radius:4px; padding:8px; color:#64748b; font-size:10px; text-align:center;">+ Upload swatch image (optional)</div>
+      </div>
+
+      <div style="background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12); border-radius:6px; padding:10px; margin-bottom:8px;">
+        <div style="color:#94a3b8; font-size:10px; margin-bottom:6px;">TARGET COLOR (CUSTOMER GOAL)</div>
+        <div style="display:flex; gap:6px; margin-bottom:6px;">
+          <select style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:4px 6px; color:#f8fafc; font-size:10px; flex:0 0 70px;">
+            <option>RGB</option><option>HEX</option><option>Pantone</option>
+          </select>
+          <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:4px 8px; color:#60a5fa; font-size:10px; flex:1;">R:72 G:61 B:139</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.05); border:1px dashed rgba(255,255,255,0.15); border-radius:4px; padding:8px; color:#64748b; font-size:10px; text-align:center;">+ Upload customer logo (optional)</div>
+      </div>
+
+      <div style="background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12); border-radius:6px; padding:10px; margin-bottom:10px;">
+        <div style="color:#94a3b8; font-size:10px; margin-bottom:6px;">CUSTOMER'S GOAL (free text)</div>
+        <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:6px 8px; color:#64748b; font-size:10px; font-style:italic;">"customer wants brighter, warmer tones..."</div>
+      </div>
+
+      <div style="background: linear-gradient(135deg, #833ab4, #c13584); border-radius:4px; padding:8px; text-align:center; color:white; font-size:11px; font-weight:600;">GENERATE SWATCH SET →</div>
+    </div>
+    <div class="card-body">
+      <h3>A — Stacked Sections</h3>
+      <p>Baseline, Target, and Goal each in their own labeled panel. Clear separation, easy to scan.</p>
+    </div>
+  </div>
+
+  <!-- Option B: Compact two-column -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0f172a; padding:16px; border-radius:6px; font-family:sans-serif;">
+      <div style="color:#a78bfa; font-size:11px; font-weight:600; letter-spacing:1px; margin-bottom:10px;">SWATCH SET CREATOR</div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+        <div style="background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12); border-radius:6px; padding:10px;">
+          <div style="color:#94a3b8; font-size:9px; margin-bottom:6px;">BASELINE CMYK</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px; margin-bottom:6px;">
+            <div style="background:rgba(255,255,255,0.05); border-radius:3px; padding:3px 5px; color:#60a5fa; font-size:10px; text-align:center;">C 45</div>
+            <div style="background:rgba(255,255,255,0.05); border-radius:3px; padding:3px 5px; color:#f472b6; font-size:10px; text-align:center;">M 30</div>
+            <div style="background:rgba(255,255,255,0.05); border-radius:3px; padding:3px 5px; color:#facc15; font-size:10px; text-align:center;">Y 0</div>
+            <div style="background:rgba(255,255,255,0.05); border-radius:3px; padding:3px 5px; color:#94a3b8; font-size:10px; text-align:center;">K 10</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.05); border:1px dashed rgba(255,255,255,0.12); border-radius:3px; padding:4px; color:#64748b; font-size:9px; text-align:center;">img (opt)</div>
+        </div>
+
+        <div style="background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12); border-radius:6px; padding:10px;">
+          <div style="color:#94a3b8; font-size:9px; margin-bottom:6px;">TARGET COLOR</div>
+          <select style="width:100%; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:3px; padding:3px; color:#f8fafc; font-size:9px; margin-bottom:4px;">
+            <option>Pantone</option><option>HEX</option><option>RGB</option>
+          </select>
+          <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:3px; padding:4px; color:#a78bfa; font-size:10px;">485 C</div>
+          <div style="background:rgba(255,255,255,0.05); border:1px dashed rgba(255,255,255,0.12); border-radius:3px; padding:4px; color:#64748b; font-size:9px; text-align:center; margin-top:4px;">img (opt)</div>
+        </div>
+      </div>
+
+      <div style="background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12); border-radius:6px; padding:10px; margin-bottom:10px;">
+        <div style="color:#94a3b8; font-size:9px; margin-bottom:4px;">CUSTOMER'S GOAL</div>
+        <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:3px; padding:5px 7px; color:#64748b; font-size:9px; font-style:italic;">"warmer, brighter tones..."</div>
+      </div>
+
+      <div style="background: linear-gradient(135deg, #833ab4, #c13584); border-radius:4px; padding:8px; text-align:center; color:white; font-size:11px; font-weight:600;">GENERATE SWATCH SET →</div>
+    </div>
+    <div class="card-body">
+      <h3>B — Side-by-Side Panels</h3>
+      <p>Baseline and Target sit next to each other like a "before/after" pairing. More compact.</p>
+    </div>
+  </div>
+
+</div>
