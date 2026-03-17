@@ -195,22 +195,55 @@ def build_swatches(base: tuple, goal: tuple) -> list:
     Generate 9 swatch dicts for a 3×3 grid.
     Center [1,1] is the original base. The 8 surrounding swatches
     explore different paths toward the goal CMYK.
+
+    Single-channel push swatches (C/M/Y) fall back gracefully when the
+    base and goal share the same channel value — avoiding duplicate swatches.
+    Fallback priority: K Push → K Drop → small nudge in the same channel.
     """
     bc, bm, by, bk = base
     gc, gm, gy, gk = goal
 
+    def _c_push():
+        if gc != bc:
+            return (gc, bm, by, bk), "C Push"
+        # C channel won't move — try K Drop (brightening)
+        k_alt = _clamp(bk - 10, 0, 100)
+        if k_alt != bk:
+            return (bc, bm, by, k_alt), "K Drop"
+        return (_clamp(bc - 8, 0, 100), bm, by, bk), "C Reduce"
+
+    def _m_push():
+        if gm != bm:
+            return (bc, gm, by, bk), "M Push"
+        # M channel won't move — nudge M slightly
+        m_alt = _clamp(bm + 8, 0, 100) if bm <= 92 else _clamp(bm - 8, 0, 100)
+        return (bc, m_alt, by, bk), "M Tweak"
+
+    def _y_push():
+        if gy != by:
+            return (bc, bm, gy, bk), "Y Push"
+        # Y channel won't move — substitute K Push if K differs, else warm nudge
+        if gk != bk:
+            return (bc, bm, by, gk), "K Push"
+        y_alt = _clamp(by + 5, 0, 100)
+        return (bc, bm, y_alt, bk), "Warm+"
+
+    c_cmyk, c_label = _c_push()
+    m_cmyk, m_label = _m_push()
+    y_cmyk, y_label = _y_push()
+
     return [
         # Row 0
-        {"cmyk": lerp_cmyk(base, goal, 0.25),   "label": "25% Shift", "row": 0, "col": 0},
-        {"cmyk": (gc, bm, by, bk),               "label": "C Push",    "row": 0, "col": 1},
-        {"cmyk": (bc, gm, by, bk),               "label": "M Push",    "row": 0, "col": 2},
+        {"cmyk": lerp_cmyk(base, goal, 0.25), "label": "25% Shift", "row": 0, "col": 0},
+        {"cmyk": c_cmyk,                       "label": c_label,     "row": 0, "col": 1},
+        {"cmyk": m_cmyk,                       "label": m_label,     "row": 0, "col": 2},
         # Row 1
-        {"cmyk": lerp_cmyk(base, goal, 0.50),   "label": "50% Shift", "row": 1, "col": 0},
-        {"cmyk": base,                            "label": "Original",  "row": 1, "col": 1},
-        {"cmyk": lerp_cmyk(base, goal, 0.75),   "label": "75% Shift", "row": 1, "col": 2},
+        {"cmyk": lerp_cmyk(base, goal, 0.50), "label": "50% Shift", "row": 1, "col": 0},
+        {"cmyk": base,                         "label": "Original",  "row": 1, "col": 1},
+        {"cmyk": lerp_cmyk(base, goal, 0.75), "label": "75% Shift", "row": 1, "col": 2},
         # Row 2
-        {"cmyk": (bc, bm, gy, bk),               "label": "Y Push",    "row": 2, "col": 0},
-        {"cmyk": goal,                            "label": "Goal",      "row": 2, "col": 1},
+        {"cmyk": y_cmyk,                       "label": y_label,     "row": 2, "col": 0},
+        {"cmyk": goal,                         "label": "Goal",      "row": 2, "col": 1},
         {"cmyk": (gc, gm, gy, _clamp(gk - 10, 0, 100)), "label": "Goal +", "row": 2, "col": 2},
     ]
 
