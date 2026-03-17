@@ -1,0 +1,3 @@
+{"type":"server-started","port":54100,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:54100","screen_dir":"C:/Users/Benjamin/Desktop/Python Apps/printssistant/.claude/worktrees/great-chandrasekhar/.superpowers/brainstorm/765-1773414316"}
+{"type":"screen-added","file":"C:\\Users\\Benjamin\\Desktop\\Python Apps\\printssistant\\.claude\\worktrees\\great-chandrasekhar\\.superpowers\\brainstorm\\765-1773414316\\module-ui-layout.html"}
+{"type":"server-stopped","reason":"owner process exited"}
