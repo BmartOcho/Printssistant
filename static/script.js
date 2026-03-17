@@ -38,8 +38,20 @@ const stringResult = document.getElementById('string-result');
 const copyBtn = document.getElementById('copy-btn');
 const generateBtn = document.getElementById('evenodd-generate-btn');
 
+// Swatchset UI
+const swatchsetSettings   = document.getElementById('tool-settings-swatchset');
+const ssRefZone           = document.getElementById('ss-ref-zone');
+const ssRefInput          = document.getElementById('ss-ref-input');
+const ssRefName           = document.getElementById('ss-ref-name');
+const swatchsetGenerateBtn = document.getElementById('swatchset-generate-btn');
+const ssGoalRadios        = document.querySelectorAll('input[name="ss-goal-type"]');
+const ssGoalRgbInputs     = document.getElementById('ss-goal-rgb-inputs');
+const ssGoalHexInputs     = document.getElementById('ss-goal-hex-inputs');
+const ssGoalPantoneInputs = document.getElementById('ss-goal-pantone-inputs');
+
 let currentTool = 'duplexer';
 let insertFile = null;
+let ssRefFile = null;
 
 // Tab Switching
 tabBtns.forEach(btn => {
@@ -57,6 +69,7 @@ function updateUIForTool() {
     evenoddSettings.classList.add('hidden');
     cropperSettings.classList.add('hidden');
     vectorizerSettings.classList.add('hidden');
+    swatchsetSettings.classList.add('hidden');
     dropZone.classList.remove('hidden');
     stringResultContainer.classList.add('hidden');
     
@@ -81,6 +94,9 @@ function updateUIForTool() {
         fileInput.accept = ".png,.jpg,.jpeg";
     } else if (currentTool === 'evenodd') {
         evenoddSettings.classList.remove('hidden');
+        dropZone.classList.add('hidden');
+    } else if (currentTool === 'swatchset') {
+        swatchsetSettings.classList.remove('hidden');
         dropZone.classList.add('hidden');
     }
 }
@@ -205,6 +221,132 @@ async function handleUpload(file) {
 
 resetBtn.addEventListener('click', resetUI);
 
+// ── Swatchset: Goal type radio toggle ────────────────────────────────────
+ssGoalRadios.forEach(radio => {
+    radio.addEventListener('change', () => {
+        const val = document.querySelector('input[name="ss-goal-type"]:checked').value;
+        ssGoalRgbInputs.classList.toggle('hidden', val !== 'rgb');
+        ssGoalHexInputs.classList.toggle('hidden', val !== 'hex');
+        ssGoalPantoneInputs.classList.toggle('hidden', val !== 'pantone');
+    });
+});
+
+// ── Swatchset: Reference image upload ────────────────────────────────────
+ssRefZone.addEventListener('click', () => ssRefInput.click());
+ssRefInput.addEventListener('change', () => {
+    if (ssRefInput.files.length > 0) {
+        ssRefFile = ssRefInput.files[0];
+        ssRefName.innerText = ssRefFile.name;
+        ssRefZone.classList.add('has-file');
+    }
+});
+ssRefZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    ssRefZone.classList.add('dragging');
+});
+ssRefZone.addEventListener('dragleave', () => ssRefZone.classList.remove('dragging'));
+ssRefZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    ssRefZone.classList.remove('dragging');
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+        ssRefFile = files[0];
+        ssRefName.innerText = ssRefFile.name;
+        ssRefZone.classList.add('has-file');
+    }
+});
+
+// ── Swatchset: Update button label when format changes ────────────────────
+document.querySelectorAll('input[name="ss-format"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+        const fmt = document.querySelector('input[name="ss-format"]:checked').value;
+        swatchsetGenerateBtn.textContent = `Generate Swatch Set ${fmt.toUpperCase()}`;
+    });
+});
+
+// ── Swatchset: Generate button ────────────────────────────────────────────
+swatchsetGenerateBtn.addEventListener('click', async () => {
+    const goalType = document.querySelector('input[name="ss-goal-type"]:checked').value;
+
+    // Client-side validation
+    if (goalType === 'hex') {
+        const hexVal = document.getElementById('ss-goal-hex-val').value.trim();
+        if (!hexVal || !/^#?[0-9a-fA-F]{6}$/.test(hexVal)) {
+            alert('Please enter a valid 6-digit hex color (e.g. #FF5733).');
+            return;
+        }
+    }
+    if (goalType === 'pantone') {
+        const ptVal = document.getElementById('ss-goal-pantone-val').value.trim();
+        if (!ptVal) {
+            alert('Please enter a Pantone color code (e.g. 485 C).');
+            return;
+        }
+    }
+
+    // Build FormData
+    const outputFormat = document.querySelector('input[name="ss-format"]:checked').value;
+    const formData = new FormData();
+    formData.append('base_c', document.getElementById('ss-base-c').value);
+    formData.append('base_m', document.getElementById('ss-base-m').value);
+    formData.append('base_y', document.getElementById('ss-base-y').value);
+    formData.append('base_k', document.getElementById('ss-base-k').value);
+    formData.append('goal_type', goalType);
+    formData.append('output_format', outputFormat);
+
+    if (goalType === 'rgb') {
+        formData.append('goal_r', document.getElementById('ss-goal-r').value);
+        formData.append('goal_g', document.getElementById('ss-goal-g').value);
+        formData.append('goal_b', document.getElementById('ss-goal-b').value);
+    } else if (goalType === 'hex') {
+        formData.append('goal_hex', document.getElementById('ss-goal-hex-val').value.trim());
+    } else if (goalType === 'pantone') {
+        formData.append('goal_pantone', document.getElementById('ss-goal-pantone-val').value.trim());
+    }
+
+    if (ssRefFile) {
+        formData.append('reference_image', ssRefFile);
+    }
+
+    // Show progress
+    swatchsetSettings.classList.add('hidden');
+    progressContainer.classList.remove('hidden');
+    statusText.innerText = `Generating Swatch Set ${outputFormat.toUpperCase()}...`;
+
+    let progress = 0;
+    const intervalAnim = setInterval(() => {
+        if (progress < 90) {
+            progress += 10;
+            progressFill.style.width = `${progress}%`;
+        }
+    }, 80);
+
+    try {
+        const response = await fetch('/swatchset', { method: 'POST', body: formData });
+        const data = await response.json();
+
+        clearInterval(intervalAnim);
+        progressFill.style.width = '100%';
+
+        if (data.status === 'success') {
+            setTimeout(() => {
+                progressContainer.classList.add('hidden');
+                resultContainer.classList.remove('hidden');
+                downloadLink.href = `/download/${data.filename}`;
+                downloadLink.download = data.filename;
+                resetBtn.textContent = 'Create New Swatch Set';
+            }, 500);
+        } else {
+            alert('Error: ' + (data.message || 'Unknown error'));
+            resetUI();
+        }
+    } catch (err) {
+        clearInterval(intervalAnim);
+        alert('Failed to connect to server.');
+        resetUI();
+    }
+});
+
 // Handle EvenOdd Generate Button
 generateBtn.addEventListener('click', async () => {
     const formData = new FormData();
@@ -254,12 +396,18 @@ function resetUI() {
     progressContainer.classList.add('hidden');
     stringResultContainer.classList.add('hidden');
     
-    if (currentTool !== 'evenodd') {
+    if (currentTool !== 'evenodd' && currentTool !== 'swatchset') {
         dropZone.classList.remove('hidden');
-    } else {
+    } else if (currentTool === 'evenodd') {
         evenoddSettings.classList.remove('hidden');
+    } else if (currentTool === 'swatchset') {
+        swatchsetSettings.classList.remove('hidden');
+        ssRefFile = null;
+        ssRefName.innerText = '';
+        ssRefZone.classList.remove('has-file');
+        resetBtn.textContent = 'Process Another';
     }
-    
+
     fileInput.value = '';
     progressFill.style.width = '0%';
     

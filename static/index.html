@@ -33,6 +33,7 @@
         <button class="tab-btn" data-tool="evenodd">Even/Odd Gen</button>
         <button class="tab-btn" data-tool="cropper">Auto-Cropper</button>
         <button class="tab-btn" data-tool="vectorizer">Vectorizer</button>
+        <button class="tab-btn" data-tool="swatchset">Swatch Set</button>
       </div>
 
       <section class="tool-card glass">
@@ -150,6 +151,105 @@
               <option value="full_color">Full Color</option>
             </select>
           </div>
+        </div>
+
+        <!-- Swatch Set Creator Settings -->
+        <div id="tool-settings-swatchset" class="settings-panel hidden">
+          <h3>Swatch Set Creator</h3>
+          <p class="settings-desc">
+            Generate a printable CMYK swatch comparison PDF to show your
+            customer what's achievable between their current color and goal.
+          </p>
+
+          <!-- Baseline CMYK -->
+          <h4 class="swatchset-subhead">Baseline CMYK (Current Printed Color)</h4>
+          <div class="swatchset-cmyk-row">
+            <div class="swatchset-cmyk-field">
+              <label for="ss-base-c">C</label>
+              <input type="number" id="ss-base-c" class="glass-input swatchset-num" value="0" min="0" max="100" />
+            </div>
+            <div class="swatchset-cmyk-field">
+              <label for="ss-base-m">M</label>
+              <input type="number" id="ss-base-m" class="glass-input swatchset-num" value="0" min="0" max="100" />
+            </div>
+            <div class="swatchset-cmyk-field">
+              <label for="ss-base-y">Y</label>
+              <input type="number" id="ss-base-y" class="glass-input swatchset-num" value="0" min="0" max="100" />
+            </div>
+            <div class="swatchset-cmyk-field">
+              <label for="ss-base-k">K</label>
+              <input type="number" id="ss-base-k" class="glass-input swatchset-num" value="0" min="0" max="100" />
+            </div>
+          </div>
+
+          <!-- Goal Color -->
+          <h4 class="swatchset-subhead" style="margin-top: 1.25rem">Customer's Goal Color</h4>
+          <div class="swatchset-radio-row">
+            <label class="swatchset-radio-label">
+              <input type="radio" name="ss-goal-type" value="rgb" checked /> RGB
+            </label>
+            <label class="swatchset-radio-label">
+              <input type="radio" name="ss-goal-type" value="hex" /> Hex
+            </label>
+            <label class="swatchset-radio-label">
+              <input type="radio" name="ss-goal-type" value="pantone" /> Pantone
+            </label>
+          </div>
+
+          <div id="ss-goal-rgb-inputs" class="swatchset-cmyk-row">
+            <div class="swatchset-cmyk-field">
+              <label for="ss-goal-r">R</label>
+              <input type="number" id="ss-goal-r" class="glass-input swatchset-num" value="0" min="0" max="255" />
+            </div>
+            <div class="swatchset-cmyk-field">
+              <label for="ss-goal-g">G</label>
+              <input type="number" id="ss-goal-g" class="glass-input swatchset-num" value="0" min="0" max="255" />
+            </div>
+            <div class="swatchset-cmyk-field">
+              <label for="ss-goal-b">B</label>
+              <input type="number" id="ss-goal-b" class="glass-input swatchset-num" value="0" min="0" max="255" />
+            </div>
+          </div>
+
+          <div id="ss-goal-hex-inputs" class="hidden">
+            <input type="text" id="ss-goal-hex-val" class="glass-input"
+              style="width: 130px; text-align: left; padding-left: 0.5rem"
+              placeholder="#FF5733" maxlength="7" />
+          </div>
+
+          <div id="ss-goal-pantone-inputs" class="hidden">
+            <input type="text" id="ss-goal-pantone-val" class="glass-input"
+              style="width: 180px; text-align: left; padding-left: 0.5rem"
+              placeholder="485 C" />
+          </div>
+
+          <!-- Optional Reference Image -->
+          <h4 class="swatchset-subhead" style="margin-top: 1.25rem">
+            Reference Image
+            <span style="font-weight: 400; opacity: 0.55">(Optional)</span>
+          </h4>
+          <div class="upload-area sub-upload" id="ss-ref-zone" style="padding: 0.75rem">
+            <p style="font-size: 0.85rem; margin: 0; opacity: 0.8">
+              Click or drop a logo / swatch photo to embed in the PDF
+            </p>
+            <input type="file" id="ss-ref-input" hidden accept=".png,.jpg,.jpeg" />
+            <span id="ss-ref-name" class="file-name"></span>
+          </div>
+
+          <!-- Output Format -->
+          <h4 class="swatchset-subhead" style="margin-top: 1.25rem">Output Format</h4>
+          <div class="swatchset-radio-row">
+            <label class="swatchset-radio-label">
+              <input type="radio" name="ss-format" value="pdf" checked /> PDF — Vector (Illustrator-editable)
+            </label>
+            <label class="swatchset-radio-label">
+              <input type="radio" name="ss-format" value="eps" /> EPS — Legacy Vector
+            </label>
+          </div>
+
+          <button id="swatchset-generate-btn" class="btn-primary" style="margin-top: 1.5rem; width: 100%">
+            Generate Swatch Set PDF
+          </button>
         </div>
 
         <!-- Main Upload Area -->

@@ -2,15 +2,17 @@ import os
 import shutil
 import zipfile
 from pathlib import Path
-from fastapi import FastAPI, UploadFile, File, BackgroundTasks, Form
+from typing import Optional
+from fastapi import FastAPI, UploadFile, File, BackgroundTasks, Form, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from duplexer import make_duplex
 from cropper_logic import process_auto_crop
 from insert_logic import insert_pages
 from even_odd_logic import generate_even_odd
 from vectorizer import engine as vectorizer_engine
 from presets import get_preset
+from swatchset_logic import generate_swatchset
 
 app = FastAPI(title="Printssistant API")
 
@@ -34,13 +36,14 @@ async def read_index():
 
 @app.post("/upload")
 async def upload_pdf(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
-    # Save uploaded file
-    file_path = UPLOAD_DIR / file.filename
+    # Sanitize filename to prevent path traversal
+    safe_name = Path(file.filename).name
+    file_path = UPLOAD_DIR / safe_name
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
-    
+
     # Define output path
-    output_filename = f"duplex_{file.filename}"
+    output_filename = f"duplex_{safe_name}"
     output_path = PROCESSED_DIR / output_filename
     
     # Process the file
@@ -53,26 +56,33 @@ async def upload_pdf(background_tasks: BackgroundTasks, file: UploadFile = File(
 
 @app.post("/crop")
 async def crop_pdf(
-    file: UploadFile = File(...), 
-    rows: int = Form(...), 
+    file: UploadFile = File(...),
+    rows: int = Form(...),
     cols: int = Form(...)
 ):
-    file_path = UPLOAD_DIR / file.filename
+    safe_name = Path(file.filename).name
+    file_path = UPLOAD_DIR / safe_name
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
-    
+
+    if rows < 1 or cols < 1:
+        return JSONResponse(status_code=400, content={"status": "error", "message": "rows and cols must be at least 1"})
+
     # Process
     cropped_files = process_auto_crop(file_path, PROCESSED_DIR, rows, cols)
-    
+
+    if not cropped_files:
+        return JSONResponse(status_code=500, content={"status": "error", "message": "Crop produced no output"})
+
     # If multiple files, zip them
     if len(cropped_files) > 1:
-        zip_filename = f"cropped_{file.filename}.zip"
+        zip_filename = f"cropped_{safe_name}.zip"
         zip_path = PROCESSED_DIR / zip_filename
         with zipfile.ZipFile(zip_path, 'w') as zipf:
             for f in cropped_files:
                 zipf.write(PROCESSED_DIR / f, arcname=f)
         return {"status": "success", "filename": zip_filename}
-    
+
     return {"status": "success", "filename": cropped_files[0]}
 
 @app.post("/insert")
@@ -81,15 +91,15 @@ async def insert_pdf(
     insert_file: UploadFile = File(...),
     interval: int = Form(...)
 ):
-    base_path = UPLOAD_DIR / base_file.filename
+    base_path = UPLOAD_DIR / Path(base_file.filename).name
     with open(base_path, "wb") as buffer:
         shutil.copyfileobj(base_file.file, buffer)
-        
-    insert_path = UPLOAD_DIR / insert_file.filename
+
+    insert_path = UPLOAD_DIR / Path(insert_file.filename).name
     with open(insert_path, "wb") as buffer:
         shutil.copyfileobj(insert_file.file, buffer)
-        
-    output_filename = f"inserted_{base_file.filename}"
+
+    output_filename = f"inserted_{Path(base_file.filename).name}"
     output_path = PROCESSED_DIR / output_filename
     
     success = insert_pages(base_path, insert_path, output_path, interval=interval, positions=[])
@@ -125,7 +135,7 @@ async def vectorize_image(
         result = vectorizer_engine.vectorize(image_bytes, preset_config)
         import time
         timestamp = int(time.time())
-        basename = os.path.splitext(file.filename)[0]
+        basename = os.path.splitext(Path(file.filename).name)[0]
         svg_filename = f"{basename}_{preset}_{timestamp}.svg"
         svg_path = PROCESSED_DIR / svg_filename
         
@@ -141,12 +151,54 @@ async def vectorize_image(
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+@app.post("/swatchset")
+async def create_swatchset(
+    base_c: int = Form(...),
+    base_m: int = Form(...),
+    base_y: int = Form(...),
+    base_k: int = Form(...),
+    goal_type: str = Form(...),
+    goal_r: int = Form(0),
+    goal_g: int = Form(0),
+    goal_b: int = Form(0),
+    goal_hex: str = Form(""),
+    goal_pantone: str = Form(""),
+    output_format: str = Form("pdf"),
+    reference_image: Optional[UploadFile] = File(None)
+):
+    import time
+    ref_bytes = None
+    if reference_image and reference_image.filename:
+        ref_bytes = await reference_image.read()
+
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    ext = "eps" if output_format == "eps" else "pdf"
+    output_path = PROCESSED_DIR / f"swatchset_{timestamp}.{ext}"
+
+    success = generate_swatchset(
+        output_path=output_path,
+        base_c=base_c, base_m=base_m, base_y=base_y, base_k=base_k,
+        goal_type=goal_type,
+        goal_r=goal_r, goal_g=goal_g, goal_b=goal_b,
+        goal_hex=goal_hex,
+        goal_pantone=goal_pantone,
+        reference_image_bytes=ref_bytes,
+        output_format=output_format,
+    )
+
+    if success:
+        return {"status": "success", "filename": output_path.name}
+    fmt_label = "EPS" if output_format == "eps" else "PDF"
+    return {"status": "error", "message": f"Failed to generate swatch set {fmt_label}"}
+
+
 @app.get("/download/{filename}")
 async def download_file(filename: str):
-    file_path = PROCESSED_DIR / filename
-    if file_path.exists():
-        return FileResponse(file_path, filename=filename)
-    return {"error": "File not found"}
+    safe_name = Path(filename).name
+    file_path = PROCESSED_DIR / safe_name
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(file_path, filename=safe_name)
 
 if __name__ == "__main__":
     import uvicorn
