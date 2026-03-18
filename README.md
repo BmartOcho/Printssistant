@@ -1,4 +1,4 @@
-# Duplexer 📄📄
+# Printssistant 📄📄
 
 A simple Python utility to duplex PDF files. It takes each page of a PDF and duplicates it (Front and Back), which is useful for certain printing workflows.
 
