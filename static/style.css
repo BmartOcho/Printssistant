@@ -272,6 +272,13 @@ footer {
   border-width: 1px !important;
 }
 
+/* Children must not intercept drag events — drops would silently cancel
+   because the child has no dragover/preventDefault handler */
+.sub-upload * {
+  pointer-events: none;
+}
+
+
 .sub-upload p {
   margin: 0;
   font-size: 0.9rem;
