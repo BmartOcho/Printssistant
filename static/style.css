@@ -89,7 +89,7 @@ main {
 }
 
 header h1 {
-  font-size: 3rem;
+  font-size: 3.75rem;
   font-weight: 800;
   letter-spacing: -1px;
   margin-bottom: 0.5rem;
@@ -327,7 +327,7 @@ select.glass-input {
   }
 
   header h1 {
-    font-size: 2rem;
+    font-size: 2.25rem;
   }
 
   header p {
@@ -446,10 +446,10 @@ select.glass-input {
 }
 
 .pro-cta-title {
-  font-size: 3rem;
+  font-size: 2rem;
   font-weight: 800;
   letter-spacing: -1px;
-  color: var(--accent);       /* red — inverted from main title */
+  color: var(--accent);
   margin-bottom: 0.5rem;
   line-height: 1;
 }

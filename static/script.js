@@ -111,6 +111,26 @@ insertFileInput.addEventListener('change', () => {
     }
 });
 
+insertFileZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    insertFileZone.classList.add('dragging');
+});
+
+insertFileZone.addEventListener('dragleave', () => {
+    insertFileZone.classList.remove('dragging');
+});
+
+insertFileZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    insertFileZone.classList.remove('dragging');
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+        insertFile = files[0];
+        insertFileName.innerText = insertFile.name;
+        insertFileZone.classList.add('has-file');
+    }
+});
+
 // Handle Drag & Drop (Main File)
 dropZone.addEventListener('dragover', (e) => {
     e.preventDefault();
