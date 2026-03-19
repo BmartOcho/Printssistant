@@ -101,9 +101,10 @@ header h1 span {
 
 header p {
   opacity: 0.7;
-  margin-bottom: 3rem;
+  margin-bottom: 1rem;
   font-weight: 300;
 }
+
 
 .glass {
   background: var(--glass-bg);
@@ -431,85 +432,36 @@ select.glass-input {
   cursor: pointer;
 }
 
-/* ── Pro Badge Button ─────────────────────────────────────────────────── */
-.pro-badge-wrapper {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 1.75rem;  /* space before tool tabs */
-}
-
-.pro-badge-btn {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+/* ── Pro CTA Section ──────────────────────────────────────────────────── */
+.pro-cta {
+  display: block;
+  text-align: center;
   text-decoration: none;
-  cursor: pointer;
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #d4af37 0%, #f9e47b 50%, #b8860b 100%);
-  box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.7);
-  animation: pro-pulse 2.8s ease-in-out infinite;
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  margin-bottom: 3rem;   /* same gap as header p → tool tabs */
+  transition: opacity 0.2s ease;
 }
 
-.pro-badge-btn:hover {
-  transform: scale(1.15) translateY(-2px);
-  box-shadow:
-    0 0 24px rgba(212, 175, 55, 0.8),
-    0 8px 24px rgba(0, 0, 0, 0.4);
-  animation: none;
+.pro-cta:hover {
+  opacity: 0.8;
 }
 
-@keyframes pro-pulse {
-  0%   { box-shadow: 0 0 0 0   rgba(212, 175, 55, 0.7); }
-  60%  { box-shadow: 0 0 0 12px rgba(212, 175, 55, 0);   }
-  100% { box-shadow: 0 0 0 0   rgba(212, 175, 55, 0);   }
-}
-
-.pro-crown {
-  font-size: 1.6rem;
+.pro-cta-title {
+  font-size: 3rem;
+  font-weight: 800;
+  letter-spacing: -1px;
+  color: var(--accent);       /* red — inverted from main title */
+  margin-bottom: 0.5rem;
   line-height: 1;
-  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
-  pointer-events: none;
-  user-select: none;
 }
 
-/* Tooltip */
-.pro-tooltip {
-  position: absolute;
-  bottom: calc(100% + 10px);
-  left: 50%;
-  transform: translateX(-50%) translateY(4px);
-  background: rgba(15, 23, 42, 0.95);
-  border: 1px solid rgba(212, 175, 55, 0.45);
-  color: #f9e47b;
-  font-size: 0.8rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-  padding: 0.4rem 0.85rem;
-  border-radius: 8px;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.2s ease, transform 0.2s ease;
-  backdrop-filter: blur(8px);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+.pro-cta-title span {
+  color: var(--text-white);   /* white period — inverted from main title */
 }
 
-/* Tooltip arrow */
-.pro-tooltip::after {
-  content: '';
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  border: 5px solid transparent;
-  border-top-color: rgba(212, 175, 55, 0.45);
+.pro-cta-sub {
+  opacity: 0.7;
+  font-weight: 300;
+  font-size: 1rem;
+  color: var(--text-white);
 }
 
-.pro-badge-btn:hover .pro-tooltip {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
