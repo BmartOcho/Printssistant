@@ -13,10 +13,12 @@ from even_odd_logic import generate_even_odd
 from vectorizer import engine as vectorizer_engine
 from presets import get_preset
 from swatchset_logic import generate_swatchset
-from auth import get_current_user, require_pro, check_free_limit
+from auth import get_current_user, require_pro, check_free_limit, create_access_token
 from db import supabase, increment_job_count
+from passlib.context import CryptContext
 
 app = FastAPI(title="Printssistant API")
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Setup directories
 import tempfile
@@ -40,16 +42,67 @@ async def read_index():
     return FileResponse(BASE_DIR / "static" / "index.html")
 
 
-@app.get("/config")
-async def get_config():
-    """Public config for the frontend — safe to expose (anon key only)."""
+# ── Auth ─────────────────────────────────────────────────────────────────────
+
+@app.post("/auth/signup")
+async def signup(request: Request):
+    """Create a new account with email + password."""
+    body = await request.json()
+    email = body.get("email", "").strip().lower()
+    password = body.get("password", "")
+
+    if not email or not password:
+        raise HTTPException(status_code=400, detail="Email and password required")
+    if len(password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+
+    # Check if already exists
+    existing = supabase.table("users").select("id").eq("email", email).execute()
+    if existing.data:
+        raise HTTPException(status_code=409, detail="An account with this email already exists")
+
+    import uuid
+    user_id = str(uuid.uuid4())
+    password_hash = pwd_context.hash(password)
+
+    supabase.table("users").insert({
+        "id": user_id,
+        "email": email,
+        "password_hash": password_hash,
+        "is_pro": False,
+        "monthly_jobs": 0,
+    }).execute()
+
+    token = create_access_token(user_id, email)
+    return {"access_token": token, "email": email, "is_pro": False, "monthly_jobs": 0}
+
+
+@app.post("/auth/signin")
+async def signin(request: Request):
+    """Sign in with email + password, returns a JWT."""
+    body = await request.json()
+    email = body.get("email", "").strip().lower()
+    password = body.get("password", "")
+
+    if not email or not password:
+        raise HTTPException(status_code=400, detail="Email and password required")
+
+    result = supabase.table("users").select("id, email, password_hash, is_pro, monthly_jobs").eq("email", email).execute()
+    if not result.data:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    user = result.data[0]
+    if not user.get("password_hash") or not pwd_context.verify(password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    token = create_access_token(user["id"], email)
     return {
-        "supabase_url": os.environ.get("SUPABASE_URL", ""),
-        "supabase_anon_key": os.environ.get("SUPABASE_ANON_KEY", ""),
+        "access_token": token,
+        "email": email,
+        "is_pro": user.get("is_pro", False),
+        "monthly_jobs": user.get("monthly_jobs", 0),
     }
 
-
-# ── Auth ─────────────────────────────────────────────────────────────────────
 
 @app.get("/auth/me")
 async def get_me(user: dict = Depends(get_current_user)):

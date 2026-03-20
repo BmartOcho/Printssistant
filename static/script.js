@@ -1,7 +1,6 @@
 // ── Auth State ──────────────────────────────────────────────────────────────
-let supabaseClient;
-let authSession = null;
 let currentUser = null;
+const TOKEN_KEY = 'ps_token';
 let authMode = 'signin'; // 'signin' | 'signup'
 
 // ── DOM References ───────────────────────────────────────────────────────────
@@ -72,26 +71,21 @@ let ssRefFile = null;
 
 // ── App Init ─────────────────────────────────────────────────────────────────
 async function initApp() {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) {
+        showAuthModal();
+        return;
+    }
     try {
-        const config = await fetch('/config').then(r => r.json());
-        supabaseClient = window.supabase.createClient(config.supabase_url, config.supabase_anon_key);
-
-        // Check for existing session
-        const { data: { session } } = await supabaseClient.auth.getSession();
-        if (session) {
-            await handleAuthSuccess(session);
-        } else {
+        const me = await fetch('/auth/me', { headers: { 'Authorization': `Bearer ${token}` } });
+        if (!me.ok) {
+            localStorage.removeItem(TOKEN_KEY);
             showAuthModal();
+            return;
         }
-
-        // Listen for auth changes (e.g. token refresh)
-        supabaseClient.auth.onAuthStateChange(async (event, session) => {
-            if (event === 'SIGNED_IN' && session) {
-                await handleAuthSuccess(session);
-            } else if (event === 'SIGNED_OUT') {
-                handleSignOut();
-            }
-        });
+        currentUser = await me.json();
+        hideAuthModal();
+        updateUIForAuthState();
     } catch (err) {
         console.error('Failed to initialize app:', err);
         showAuthModal();
@@ -100,26 +94,20 @@ async function initApp() {
 
 // ── Auth Helpers ──────────────────────────────────────────────────────────────
 function getAuthHeaders() {
-    if (!authSession?.access_token) return {};
-    return { 'Authorization': `Bearer ${authSession.access_token}` };
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return {};
+    return { 'Authorization': `Bearer ${token}` };
 }
 
-async function handleAuthSuccess(session) {
-    authSession = session;
-    try {
-        const me = await fetch('/auth/me', {
-            headers: getAuthHeaders()
-        }).then(r => r.json());
-        currentUser = me;
-    } catch {
-        currentUser = { id: session.user.id, email: session.user.email, is_pro: false, monthly_jobs: 0 };
-    }
+async function handleAuthSuccess(data) {
+    localStorage.setItem(TOKEN_KEY, data.access_token);
+    currentUser = { email: data.email, is_pro: data.is_pro, monthly_jobs: data.monthly_jobs };
     hideAuthModal();
     updateUIForAuthState();
 }
 
 function handleSignOut() {
-    authSession = null;
+    localStorage.removeItem(TOKEN_KEY);
     currentUser = null;
     userBar.classList.add('hidden');
     proCta.style.display = '';
@@ -215,19 +203,19 @@ authSubmitBtn.addEventListener('click', async () => {
     authError.classList.add('hidden');
 
     try {
-        let result;
-        if (authMode === 'signin') {
-            result = await supabaseClient.auth.signInWithPassword({ email, password });
-        } else {
-            result = await supabaseClient.auth.signUp({ email, password });
-        }
+        const endpoint = authMode === 'signin' ? '/auth/signin' : '/auth/signup';
+        const resp = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password }),
+        });
+        const data = await resp.json();
 
-        if (result.error) {
-            showAuthError(result.error.message);
-        } else if (authMode === 'signup' && !result.data.session) {
-            showAuthError('Check your email to confirm your account, then sign in.');
+        if (!resp.ok) {
+            showAuthError(data.detail || 'Something went wrong. Please try again.');
+        } else {
+            await handleAuthSuccess(data);
         }
-        // Success: onAuthStateChange fires handleAuthSuccess automatically
     } catch (err) {
         showAuthError('Something went wrong. Please try again.');
     } finally {
@@ -249,9 +237,8 @@ function showAuthError(msg) {
 }
 
 // ── Logout ────────────────────────────────────────────────────────────────────
-logoutBtn.addEventListener('click', async () => {
-    await supabaseClient.auth.signOut();
-    // handleSignOut is called via onAuthStateChange
+logoutBtn.addEventListener('click', () => {
+    handleSignOut();
 });
 
 // ── Tab Switching ─────────────────────────────────────────────────────────────
