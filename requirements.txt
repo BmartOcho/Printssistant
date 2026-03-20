@@ -9,3 +9,4 @@ Pillow>=10.0.0
 potracer>=0.0.4
 scikit-image>=0.21.0
 reportlab>=4.0.0
+supabase>=2.0.0

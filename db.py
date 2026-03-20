@@ -1,0 +1,45 @@
+import os
+from supabase import create_client, Client
+
+SUPABASE_URL = os.environ["SUPABASE_URL"]
+SUPABASE_SERVICE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
+
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
+
+def get_user_record(user_id: str) -> dict | None:
+    """Fetch a user row from the public.users table."""
+    result = supabase.table("users").select("*").eq("id", user_id).single().execute()
+    return result.data if result.data else None
+
+
+def upsert_user(user_id: str, email: str) -> None:
+    """Create or update a user record (called after login/signup)."""
+    supabase.table("users").upsert({
+        "id": user_id,
+        "email": email,
+    }, on_conflict="id").execute()
+
+
+def increment_job_count(user_id: str) -> int:
+    """Increment monthly job counter. Returns new count."""
+    import datetime
+    user = get_user_record(user_id)
+    if not user:
+        return 0
+
+    # Reset counter if it's a new month
+    reset_at = user.get("monthly_jobs_reset")
+    now = datetime.datetime.now(datetime.timezone.utc)
+    if reset_at:
+        reset_dt = datetime.datetime.fromisoformat(reset_at.replace("Z", "+00:00"))
+        if now.month != reset_dt.month or now.year != reset_dt.year:
+            supabase.table("users").update({
+                "monthly_jobs": 1,
+                "monthly_jobs_reset": now.isoformat()
+            }).eq("id", user_id).execute()
+            return 1
+
+    new_count = (user.get("monthly_jobs") or 0) + 1
+    supabase.table("users").update({"monthly_jobs": new_count}).eq("id", user_id).execute()
+    return new_count
