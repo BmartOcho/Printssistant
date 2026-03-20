@@ -6,6 +6,7 @@ from typing import Optional
 from fastapi import FastAPI, UploadFile, File, BackgroundTasks, Form, HTTPException, Depends, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from duplexer import make_duplex
 from cropper_logic import process_auto_crop
 from insert_logic import insert_pages
@@ -18,6 +19,15 @@ from db import supabase, increment_job_count
 from passlib.context import CryptContext
 
 app = FastAPI(title="Printssistant API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Setup directories
