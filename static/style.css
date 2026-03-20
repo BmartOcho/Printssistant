@@ -546,6 +546,24 @@ select.glass-input {
   margin-bottom: 0 !important;
 }
 
+/* ── Sign-In Link ────────────────────────────────────────────────────────── */
+.sign-in-bar {
+  margin-top: 0.75rem;
+  text-align: center;
+}
+
+.sign-in-link {
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.6);
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.2s;
+}
+
+.sign-in-link:hover {
+  color: white;
+}
+
 /* ── User Status Bar ─────────────────────────────────────────────────────── */
 .user-bar {
   display: flex;

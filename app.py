@@ -346,7 +346,6 @@ async def create_swatchset(
 @app.get("/download/{filename}")
 async def download_file(
     filename: str,
-    user: dict = Depends(get_current_user),
 ):
     safe_name = Path(filename).name
     file_path = PROCESSED_DIR / safe_name

@@ -54,6 +54,13 @@ const userBar             = document.getElementById('user-bar');
 const userInfoText        = document.getElementById('user-info-text');
 const logoutBtn           = document.getElementById('logout-btn');
 const proCta              = document.getElementById('pro-cta');
+const signInBar           = document.getElementById('sign-in-bar');
+const signInLink          = document.getElementById('sign-in-link');
+
+// Tools that require login (free tier)
+const AUTH_REQUIRED_TOOLS = ['duplexer', 'insertbetween', 'cropper'];
+// Tools that require Pro
+const PRO_TOOLS = ['vectorizer', 'swatchset'];
 
 // Auth modal
 const authModal           = document.getElementById('auth-modal');
@@ -73,22 +80,22 @@ let ssRefFile = null;
 async function initApp() {
     const token = localStorage.getItem(TOKEN_KEY);
     if (!token) {
-        showAuthModal();
+        // Not logged in — that's fine, let them browse
+        updateUIForAuthState();
         return;
     }
     try {
         const me = await fetch('/auth/me', { headers: { 'Authorization': `Bearer ${token}` } });
         if (!me.ok) {
             localStorage.removeItem(TOKEN_KEY);
-            showAuthModal();
+            updateUIForAuthState();
             return;
         }
         currentUser = await me.json();
-        hideAuthModal();
         updateUIForAuthState();
     } catch (err) {
-        console.error('Failed to initialize app:', err);
-        showAuthModal();
+        console.error('Failed to restore session:', err);
+        updateUIForAuthState();
     }
 }
 
@@ -104,14 +111,16 @@ async function handleAuthSuccess(data) {
     currentUser = { email: data.email, is_pro: data.is_pro, monthly_jobs: data.monthly_jobs };
     hideAuthModal();
     updateUIForAuthState();
+    // If they were trying to use a tool, let them continue
+    updateUIForTool();
 }
 
 function handleSignOut() {
     localStorage.removeItem(TOKEN_KEY);
     currentUser = null;
     userBar.classList.add('hidden');
+    signInBar.classList.remove('hidden');
     proCta.style.display = '';
-    showAuthModal();
 }
 
 function showAuthModal() {
@@ -126,8 +135,15 @@ function hideAuthModal() {
 }
 
 function updateUIForAuthState() {
-    if (!currentUser) return;
+    if (!currentUser) {
+        // Not logged in — show sign-in link, hide user bar
+        signInBar.classList.remove('hidden');
+        userBar.classList.add('hidden');
+        return;
+    }
 
+    // Logged in — hide sign-in link, show user bar
+    signInBar.classList.add('hidden');
     userBar.classList.remove('hidden');
 
     if (currentUser.is_pro) {
@@ -236,6 +252,12 @@ function showAuthError(msg) {
     authError.classList.remove('hidden');
 }
 
+// ── Sign-In Link ──────────────────────────────────────────────────────────────
+signInLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    showAuthModal();
+});
+
 // ── Logout ────────────────────────────────────────────────────────────────────
 logoutBtn.addEventListener('click', () => {
     handleSignOut();
@@ -248,9 +270,21 @@ tabBtns.forEach(btn => {
         btn.classList.add('active');
         currentTool = btn.dataset.tool;
 
-        // Check if pro tab and user is not pro
-        if (btn.classList.contains('pro-tab') && currentUser && !currentUser.is_pro) {
-            showProUpgradeInCard();
+        // Pro tools: require login + pro
+        if (PRO_TOOLS.includes(currentTool)) {
+            if (!currentUser) {
+                showAuthModal();
+                return;
+            }
+            if (!currentUser.is_pro) {
+                showProUpgradeInCard();
+                return;
+            }
+        }
+
+        // Auth-required tools: require login
+        if (AUTH_REQUIRED_TOOLS.includes(currentTool) && !currentUser) {
+            showAuthModal();
             return;
         }
 
