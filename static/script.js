@@ -128,6 +128,13 @@ function showAuthModal() {
     authEmail.focus();
 }
 
+// Dismiss auth modal by clicking the overlay background
+authModal.addEventListener('click', (e) => {
+    if (e.target === authModal) {
+        hideAuthModal();
+    }
+});
+
 function hideAuthModal() {
     authModal.classList.add('hidden');
     authError.classList.add('hidden');
