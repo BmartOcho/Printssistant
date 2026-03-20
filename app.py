@@ -90,7 +90,7 @@ async def stripe_webhook(request: Request):
 
         if customer_email:
             # Find user by email and flip is_pro
-            result = supabase.table("users").select("id").eq("email", customer_email).single().execute()
+            result = supabase.table("users").select("id").eq("email", customer_email).execute()
             if result.data:
                 import datetime
                 supabase.table("users").update({
