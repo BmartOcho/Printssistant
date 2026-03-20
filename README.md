@@ -1,43 +1,56 @@
-# Printssistant 📄📄
+# Printssistant ⚡
 
-A simple Python utility to duplex PDF files. It takes each page of a PDF and duplicates it (Front and Back), which is useful for certain printing workflows.
+A web-based toolkit for prepress and commercial printing professionals. Upload PDFs and images, get production-ready output in seconds.
 
-## Features
+**Live at [printssistant.com](https://printssistant.com)**
 
-- **Automatic Duplexing**: Duplicates every page in a PDF.
-- **Batch Processing**: Processes all PDFs in the `Add_PDF` folder.
-- **Clean Output**: Saves processed files to a `Processed` subfolder.
+## Tools
 
-## Installation
+### Free (20 jobs/month)
+- **Duplexer** — Duplicates every page in a PDF (front/back) for duplex printing workflows
+- **Auto-Cropper** — Splits PDF pages into a grid (rows × columns) for gang-run cutting
+- **Insert Between** — Interleaves pages from a second PDF at a set interval (slip sheets, inserts)
 
-1. **Clone the repository**:
+### Open (no account needed)
+- **Even/Odd Generator** — Generates even or odd page number sequences for selective printing
 
-   ```bash
-   git clone https://github.com/BmartOcho/Duplexer.git
-   cd Duplexer
-   ```
+### Pro (one-time lifetime purchase)
+- **Vectorizer** — Converts raster images to production-quality SVG with prepress-tuned presets
+- **Swatch Set Generator** — Creates CMYK swatch variation sheets for ink matching and color correction
 
-2. **Set up a virtual environment (optional but recommended)**:
+## Tech Stack
 
-   ```bash
-   python -m venv .venv
-   .venv\Scripts\activate  # On Windows
-   ```
+- **Backend**: Python / FastAPI / Uvicorn
+- **Database**: Supabase (PostgreSQL)
+- **Auth**: Custom JWT (bcrypt + python-jose)
+- **Payments**: Stripe Checkout (one-time lifetime Pro upgrade)
+- **Hosting**: Railway
+- **Frontend**: Vanilla HTML/CSS/JS
 
-3. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
+## Local Development
 
-## Usage
+```bash
+git clone https://github.com/BmartOcho/Printssistant.git
+cd Printssistant
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
 
-1. Place your PDF files in the `Add_PDF` folder.
-2. Run the script:
-   ```bash
-   python duplexer.py
-   ```
-3. Your duplexed PDFs will be in the `Add_PDF/Processed` folder.
+Set environment variables:
+```bash
+export SUPABASE_URL="your-supabase-url"
+export SUPABASE_SERVICE_KEY="your-service-key"
+export JWT_SECRET="your-secret"
+export STRIPE_SECRET_KEY="your-stripe-key"
+export STRIPE_WEBHOOK_SECRET="your-webhook-secret"
+```
+
+Run:
+```bash
+uvicorn app:app --host 0.0.0.0 --port 8000
+```
 
 ## Author
 
-**Benjamin (BmartOcho)**
+**Benjamin Martinec** · [BmartOcho](https://github.com/BmartOcho)
