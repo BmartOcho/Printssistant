@@ -472,3 +472,138 @@ select.glass-input {
   color: var(--text-white);
 }
 
+
+/* ── Auth Modal ──────────────────────────────────────────────────────────── */
+.auth-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 400px;
+  padding: 2.5rem 2rem;
+  border-radius: 24px;
+  text-align: center;
+}
+
+.auth-card h2 {
+  font-size: 1.75rem;
+  font-weight: 800;
+  margin-bottom: 0.4rem;
+}
+
+.auth-card p {
+  opacity: 0.65;
+  margin-bottom: 1.75rem;
+  font-size: 0.95rem;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.auth-input {
+  width: 100%;
+  padding: 0.8rem 1rem;
+  font-size: 1rem;
+  text-align: left;
+  border-radius: 12px;
+}
+
+.auth-submit {
+  margin: 0.25rem 0 0;
+  width: 100%;
+  padding: 0.9rem;
+}
+
+.auth-toggle-text {
+  font-size: 0.875rem;
+  opacity: 0.7;
+  margin-top: 0.25rem !important;
+  margin-bottom: 0 !important;
+}
+
+.auth-toggle-link {
+  color: var(--primary-light);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.auth-error {
+  color: var(--accent);
+  font-size: 0.875rem;
+  margin-top: 0.25rem !important;
+  margin-bottom: 0 !important;
+}
+
+/* ── User Status Bar ─────────────────────────────────────────────────────── */
+.user-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.user-info-text {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.btn-logout {
+  background: transparent;
+  border: 1px solid var(--glass-border);
+  color: white;
+  padding: 0.3rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: "Outfit", sans-serif;
+}
+
+.btn-logout:hover {
+  background: rgba(255,255,255,0.1);
+}
+
+/* ── Pro Badge on Tabs ───────────────────────────────────────────────────── */
+.pro-badge {
+  display: inline-block;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  vertical-align: middle;
+  margin-left: 0.35rem;
+  line-height: 1.4;
+}
+
+/* ── Pro Upgrade Prompt ──────────────────────────────────────────────────── */
+.pro-lock-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+#pro-upgrade-prompt {
+  text-align: center;
+  padding: 2rem 1rem;
+}
+
+#pro-upgrade-prompt h3 {
+  font-size: 1.4rem;
+  margin-bottom: 0.5rem;
+}

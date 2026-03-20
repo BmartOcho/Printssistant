@@ -40,6 +40,15 @@ async def read_index():
     return FileResponse(BASE_DIR / "static" / "index.html")
 
 
+@app.get("/config")
+async def get_config():
+    """Public config for the frontend — safe to expose (anon key only)."""
+    return {
+        "supabase_url": os.environ.get("SUPABASE_URL", ""),
+        "supabase_anon_key": os.environ.get("SUPABASE_ANON_KEY", ""),
+    }
+
+
 # ── Auth ─────────────────────────────────────────────────────────────────────
 
 @app.get("/auth/me")

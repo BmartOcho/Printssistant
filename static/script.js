@@ -1,3 +1,10 @@
+// ── Auth State ──────────────────────────────────────────────────────────────
+let supabaseClient;
+let authSession = null;
+let currentUser = null;
+let authMode = 'signin'; // 'signin' | 'signup'
+
+// ── DOM References ───────────────────────────────────────────────────────────
 const dropZone = document.getElementById('drop-zone');
 const fileInput = document.getElementById('file-input');
 const progressContainer = document.getElementById('progress-container');
@@ -7,28 +14,23 @@ const downloadLink = document.getElementById('download-link');
 const resetBtn = document.getElementById('reset-btn');
 const statusText = document.getElementById('status-text');
 
-// Tabs
 const tabBtns = document.querySelectorAll('.tab-btn');
 const insertSettings = document.getElementById('tool-settings-insert');
 const dropTitle = document.getElementById('drop-title');
 const dropDesc = document.getElementById('drop-desc');
 
-// Cropper UI
 const cropperSettings = document.getElementById('tool-settings-cropper');
 const cropperRows = document.getElementById('cropper-rows');
 const cropperCols = document.getElementById('cropper-cols');
 
-// Vectorizer UI
 const vectorizerSettings = document.getElementById('tool-settings-vectorizer');
 const vectorizerPreset = document.getElementById('vectorizer-preset');
 
-// Insert Specific UI
 const insertFileZone = document.getElementById('insert-file-zone');
 const insertFileInput = document.getElementById('insert-file-input');
 const insertFileName = document.getElementById('insert-file-name');
 const intervalInput = document.getElementById('interval-input');
 
-// EvenOdd UI
 const evenoddSettings = document.getElementById('tool-settings-evenodd');
 const evenoddStart = document.getElementById('evenodd-start');
 const evenoddEnd = document.getElementById('evenodd-end');
@@ -38,7 +40,6 @@ const stringResult = document.getElementById('string-result');
 const copyBtn = document.getElementById('copy-btn');
 const generateBtn = document.getElementById('evenodd-generate-btn');
 
-// Swatchset UI
 const swatchsetSettings   = document.getElementById('tool-settings-swatchset');
 const ssRefZone           = document.getElementById('ss-ref-zone');
 const ssRefInput          = document.getElementById('ss-ref-input');
@@ -49,59 +50,279 @@ const ssGoalRgbInputs     = document.getElementById('ss-goal-rgb-inputs');
 const ssGoalHexInputs     = document.getElementById('ss-goal-hex-inputs');
 const ssGoalPantoneInputs = document.getElementById('ss-goal-pantone-inputs');
 
+const proUpgradePrompt    = document.getElementById('pro-upgrade-prompt');
+const userBar             = document.getElementById('user-bar');
+const userInfoText        = document.getElementById('user-info-text');
+const logoutBtn           = document.getElementById('logout-btn');
+const proCta              = document.getElementById('pro-cta');
+
+// Auth modal
+const authModal           = document.getElementById('auth-modal');
+const authModalTitle      = document.getElementById('auth-modal-title');
+const authModalSubtitle   = document.getElementById('auth-modal-subtitle');
+const authEmail           = document.getElementById('auth-email');
+const authPassword        = document.getElementById('auth-password');
+const authSubmitBtn       = document.getElementById('auth-submit-btn');
+const authToggleLink      = document.getElementById('auth-toggle-link');
+const authError           = document.getElementById('auth-error');
+
 let currentTool = 'duplexer';
 let insertFile = null;
 let ssRefFile = null;
 
-// Tab Switching
+// ── App Init ─────────────────────────────────────────────────────────────────
+async function initApp() {
+    try {
+        const config = await fetch('/config').then(r => r.json());
+        supabaseClient = window.supabase.createClient(config.supabase_url, config.supabase_anon_key);
+
+        // Check for existing session
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (session) {
+            await handleAuthSuccess(session);
+        } else {
+            showAuthModal();
+        }
+
+        // Listen for auth changes (e.g. token refresh)
+        supabaseClient.auth.onAuthStateChange(async (event, session) => {
+            if (event === 'SIGNED_IN' && session) {
+                await handleAuthSuccess(session);
+            } else if (event === 'SIGNED_OUT') {
+                handleSignOut();
+            }
+        });
+    } catch (err) {
+        console.error('Failed to initialize app:', err);
+        showAuthModal();
+    }
+}
+
+// ── Auth Helpers ──────────────────────────────────────────────────────────────
+function getAuthHeaders() {
+    if (!authSession?.access_token) return {};
+    return { 'Authorization': `Bearer ${authSession.access_token}` };
+}
+
+async function handleAuthSuccess(session) {
+    authSession = session;
+    try {
+        const me = await fetch('/auth/me', {
+            headers: getAuthHeaders()
+        }).then(r => r.json());
+        currentUser = me;
+    } catch {
+        currentUser = { id: session.user.id, email: session.user.email, is_pro: false, monthly_jobs: 0 };
+    }
+    hideAuthModal();
+    updateUIForAuthState();
+}
+
+function handleSignOut() {
+    authSession = null;
+    currentUser = null;
+    userBar.classList.add('hidden');
+    proCta.style.display = '';
+    showAuthModal();
+}
+
+function showAuthModal() {
+    authModal.classList.remove('hidden');
+    authEmail.focus();
+}
+
+function hideAuthModal() {
+    authModal.classList.add('hidden');
+    authError.classList.add('hidden');
+    authError.textContent = '';
+}
+
+function updateUIForAuthState() {
+    if (!currentUser) return;
+
+    userBar.classList.remove('hidden');
+
+    if (currentUser.is_pro) {
+        userInfoText.textContent = `${currentUser.email} ⚡ Pro`;
+        proCta.style.display = 'none';
+    } else {
+        const remaining = Math.max(0, 20 - (currentUser.monthly_jobs || 0));
+        userInfoText.textContent = `${currentUser.email} · ${remaining} jobs left this month`;
+    }
+}
+
+async function handleAuthError(response) {
+    if (response.status === 401) {
+        showAuthModal();
+        resetUI();
+        return true;
+    }
+    if (response.status === 403) {
+        showProUpgradeInCard();
+        return true;
+    }
+    if (response.status === 429) {
+        showFreeLimitReached();
+        return true;
+    }
+    return false;
+}
+
+function showProUpgradeInCard() {
+    hideAllPanels();
+    proUpgradePrompt.classList.remove('hidden');
+}
+
+function showFreeLimitReached() {
+    hideAllPanels();
+    proUpgradePrompt.classList.remove('hidden');
+    proUpgradePrompt.querySelector('h3').textContent = 'Monthly Limit Reached';
+    proUpgradePrompt.querySelector('p').textContent =
+        "You've used your 20 free jobs this month. Upgrade to Pro for unlimited access.";
+}
+
+// ── Auth Modal Events ─────────────────────────────────────────────────────────
+authToggleLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    authMode = authMode === 'signin' ? 'signup' : 'signin';
+    if (authMode === 'signup') {
+        authModalTitle.textContent = 'Create Account';
+        authModalSubtitle.textContent = 'It\'s free — no credit card needed';
+        authSubmitBtn.textContent = 'Create Account';
+        authToggleLink.textContent = 'Sign in instead';
+        authToggleLink.previousSibling.textContent = 'Already have an account? ';
+    } else {
+        authModalTitle.textContent = 'Sign In';
+        authModalSubtitle.textContent = 'Access your Printssistant tools';
+        authSubmitBtn.textContent = 'Sign In';
+        authToggleLink.textContent = 'Create one free';
+        authToggleLink.previousSibling.textContent = "Don't have an account? ";
+    }
+    authError.classList.add('hidden');
+});
+
+authSubmitBtn.addEventListener('click', async () => {
+    const email = authEmail.value.trim();
+    const password = authPassword.value;
+
+    if (!email || !password) {
+        showAuthError('Please enter your email and password.');
+        return;
+    }
+
+    authSubmitBtn.disabled = true;
+    authSubmitBtn.textContent = authMode === 'signin' ? 'Signing in...' : 'Creating account...';
+    authError.classList.add('hidden');
+
+    try {
+        let result;
+        if (authMode === 'signin') {
+            result = await supabaseClient.auth.signInWithPassword({ email, password });
+        } else {
+            result = await supabaseClient.auth.signUp({ email, password });
+        }
+
+        if (result.error) {
+            showAuthError(result.error.message);
+        } else if (authMode === 'signup' && !result.data.session) {
+            showAuthError('Check your email to confirm your account, then sign in.');
+        }
+        // Success: onAuthStateChange fires handleAuthSuccess automatically
+    } catch (err) {
+        showAuthError('Something went wrong. Please try again.');
+    } finally {
+        authSubmitBtn.disabled = false;
+        authSubmitBtn.textContent = authMode === 'signin' ? 'Sign In' : 'Create Account';
+    }
+});
+
+// Allow Enter key to submit
+[authEmail, authPassword].forEach(input => {
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') authSubmitBtn.click();
+    });
+});
+
+function showAuthError(msg) {
+    authError.textContent = msg;
+    authError.classList.remove('hidden');
+}
+
+// ── Logout ────────────────────────────────────────────────────────────────────
+logoutBtn.addEventListener('click', async () => {
+    await supabaseClient.auth.signOut();
+    // handleSignOut is called via onAuthStateChange
+});
+
+// ── Tab Switching ─────────────────────────────────────────────────────────────
 tabBtns.forEach(btn => {
     btn.addEventListener('click', () => {
         tabBtns.forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         currentTool = btn.dataset.tool;
+
+        // Check if pro tab and user is not pro
+        if (btn.classList.contains('pro-tab') && currentUser && !currentUser.is_pro) {
+            showProUpgradeInCard();
+            return;
+        }
+
+        // Reset upgrade prompt title/text in case it was modified
+        proUpgradePrompt.querySelector('h3').textContent = 'Printssistant Pro Feature';
+        proUpgradePrompt.querySelector('p').textContent =
+            'Unlock the Vectorizer and Swatch Set — plus unlimited use of all tools. One-time payment, lifetime access.';
+
         updateUIForTool();
         resetUI();
     });
 });
 
-function updateUIForTool() {
+function hideAllPanels() {
     insertSettings.classList.add('hidden');
     evenoddSettings.classList.add('hidden');
     cropperSettings.classList.add('hidden');
     vectorizerSettings.classList.add('hidden');
     swatchsetSettings.classList.add('hidden');
-    dropZone.classList.remove('hidden');
+    dropZone.classList.add('hidden');
     stringResultContainer.classList.add('hidden');
-    
-    // Reset accept attribute
+    progressContainer.classList.add('hidden');
+    resultContainer.classList.add('hidden');
+    proUpgradePrompt.classList.add('hidden');
+}
+
+function updateUIForTool() {
+    hideAllPanels();
+    proUpgradePrompt.classList.add('hidden');
     fileInput.accept = ".pdf";
-    
+
     if (currentTool === 'duplexer') {
+        dropZone.classList.remove('hidden');
         dropTitle.innerText = "Drag & Drop PDF";
         dropDesc.innerText = "Standard Duplexing (Front/Back)";
     } else if (currentTool === 'insertbetween') {
         insertSettings.classList.remove('hidden');
+        dropZone.classList.remove('hidden');
         dropTitle.innerText = "Drag & Drop Main PDF";
         dropDesc.innerText = "Upload the multi-page document here";
     } else if (currentTool === 'cropper') {
         cropperSettings.classList.remove('hidden');
+        dropZone.classList.remove('hidden');
         dropTitle.innerText = "Drag & Drop PDF";
         dropDesc.innerText = "Upload the multi-page document to auto-crop";
     } else if (currentTool === 'vectorizer') {
         vectorizerSettings.classList.remove('hidden');
+        dropZone.classList.remove('hidden');
         dropTitle.innerText = "Drag & Drop Image";
         dropDesc.innerText = "Upload an image (PNG, JPG) to vectorize";
         fileInput.accept = ".png,.jpg,.jpeg";
     } else if (currentTool === 'evenodd') {
         evenoddSettings.classList.remove('hidden');
-        dropZone.classList.add('hidden');
     } else if (currentTool === 'swatchset') {
         swatchsetSettings.classList.remove('hidden');
-        dropZone.classList.add('hidden');
     }
 }
 
-// Handle Insert File
+// ── Insert File ───────────────────────────────────────────────────────────────
 insertFileZone.addEventListener('click', () => insertFileInput.click());
 insertFileInput.addEventListener('change', () => {
     if (insertFileInput.files.length > 0) {
@@ -110,16 +331,8 @@ insertFileInput.addEventListener('change', () => {
         insertFileZone.classList.add('has-file');
     }
 });
-
-insertFileZone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    insertFileZone.classList.add('dragging');
-});
-
-insertFileZone.addEventListener('dragleave', () => {
-    insertFileZone.classList.remove('dragging');
-});
-
+insertFileZone.addEventListener('dragover', (e) => { e.preventDefault(); insertFileZone.classList.add('dragging'); });
+insertFileZone.addEventListener('dragleave', () => { insertFileZone.classList.remove('dragging'); });
 insertFileZone.addEventListener('drop', (e) => {
     e.preventDefault();
     insertFileZone.classList.remove('dragging');
@@ -131,67 +344,50 @@ insertFileZone.addEventListener('drop', (e) => {
     }
 });
 
-// Handle Drag & Drop (Main File)
-dropZone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    dropZone.classList.add('dragging');
-});
-
-dropZone.addEventListener('dragleave', () => {
-    dropZone.classList.remove('dragging');
-});
-
+// ── Main Drop Zone ────────────────────────────────────────────────────────────
+dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragging'); });
+dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('dragging'); });
 dropZone.addEventListener('drop', (e) => {
     e.preventDefault();
     dropZone.classList.remove('dragging');
     const files = e.dataTransfer.files;
     if (files.length > 0) handleUpload(files[0]);
 });
-
-// Handle Click to Upload (Main File)
 dropZone.addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', () => {
     if (fileInput.files.length > 0) handleUpload(fileInput.files[0]);
 });
 
+// ── Upload Handler ────────────────────────────────────────────────────────────
 async function handleUpload(file) {
     if (currentTool !== 'vectorizer' && !file.name.toLowerCase().endsWith('.pdf')) {
         alert('Please select a PDF file.');
         return;
     }
-    
     if (currentTool === 'vectorizer' && !file.name.toLowerCase().match(/\.(jpg|jpeg|png)$/)) {
         alert('Please select a PNG or JPG file for vectorization.');
         return;
     }
-
     if (currentTool === 'insertbetween' && !insertFile) {
         alert('Please upload an Insert PDF first!');
         return;
     }
 
-    // UI Updates
     dropZone.classList.add('hidden');
     insertSettings.classList.add('hidden');
     cropperSettings.classList.add('hidden');
     vectorizerSettings.classList.add('hidden');
     progressContainer.classList.remove('hidden');
     statusText.innerText = `Processing ${file.name}...`;
-    
-    // Animate progress (simulated for small files)
+
     let progress = 0;
     const intervalAnim = setInterval(() => {
-        if (progress < 90) {
-            progress += 5;
-            progressFill.style.width = `${progress}%`;
-        }
+        if (progress < 90) { progress += 5; progressFill.style.width = `${progress}%`; }
     }, 100);
 
-    // Prepare Form Data based on tool
     const formData = new FormData();
-    
     let endpoint = '/upload';
-    
+
     if (currentTool === 'duplexer') {
         formData.append('file', file);
         endpoint = '/upload';
@@ -214,12 +410,16 @@ async function handleUpload(file) {
     try {
         const response = await fetch(endpoint, {
             method: 'POST',
+            headers: getAuthHeaders(),
             body: formData
         });
 
-        const data = await response.json();
-
         clearInterval(intervalAnim);
+
+        const handled = await handleAuthError(response);
+        if (handled) return;
+
+        const data = await response.json();
         progressFill.style.width = '100%';
 
         if (data.status === 'success') {
@@ -241,7 +441,7 @@ async function handleUpload(file) {
 
 resetBtn.addEventListener('click', resetUI);
 
-// ── Swatchset: Goal type radio toggle ────────────────────────────────────
+// ── Swatchset Goal Type Toggle ────────────────────────────────────────────────
 ssGoalRadios.forEach(radio => {
     radio.addEventListener('change', () => {
         const val = document.querySelector('input[name="ss-goal-type"]:checked').value;
@@ -251,7 +451,7 @@ ssGoalRadios.forEach(radio => {
     });
 });
 
-// ── Swatchset: Reference image upload ────────────────────────────────────
+// ── Swatchset Reference Image ─────────────────────────────────────────────────
 ssRefZone.addEventListener('click', () => ssRefInput.click());
 ssRefInput.addEventListener('change', () => {
     if (ssRefInput.files.length > 0) {
@@ -260,10 +460,7 @@ ssRefInput.addEventListener('change', () => {
         ssRefZone.classList.add('has-file');
     }
 });
-ssRefZone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    ssRefZone.classList.add('dragging');
-});
+ssRefZone.addEventListener('dragover', (e) => { e.preventDefault(); ssRefZone.classList.add('dragging'); });
 ssRefZone.addEventListener('dragleave', () => ssRefZone.classList.remove('dragging'));
 ssRefZone.addEventListener('drop', (e) => {
     e.preventDefault();
@@ -276,7 +473,7 @@ ssRefZone.addEventListener('drop', (e) => {
     }
 });
 
-// ── Swatchset: Update button label when format changes ────────────────────
+// ── Swatchset Format Label ────────────────────────────────────────────────────
 document.querySelectorAll('input[name="ss-format"]').forEach(radio => {
     radio.addEventListener('change', () => {
         const fmt = document.querySelector('input[name="ss-format"]:checked').value;
@@ -284,11 +481,10 @@ document.querySelectorAll('input[name="ss-format"]').forEach(radio => {
     });
 });
 
-// ── Swatchset: Generate button ────────────────────────────────────────────
+// ── Swatchset Generate ────────────────────────────────────────────────────────
 swatchsetGenerateBtn.addEventListener('click', async () => {
     const goalType = document.querySelector('input[name="ss-goal-type"]:checked').value;
 
-    // Client-side validation
     if (goalType === 'hex') {
         const hexVal = document.getElementById('ss-goal-hex-val').value.trim();
         if (!hexVal || !/^#?[0-9a-fA-F]{6}$/.test(hexVal)) {
@@ -304,7 +500,6 @@ swatchsetGenerateBtn.addEventListener('click', async () => {
         }
     }
 
-    // Build FormData
     const outputFormat = document.querySelector('input[name="ss-format"]:checked').value;
     const formData = new FormData();
     formData.append('base_c', document.getElementById('ss-base-c').value);
@@ -324,28 +519,30 @@ swatchsetGenerateBtn.addEventListener('click', async () => {
         formData.append('goal_pantone', document.getElementById('ss-goal-pantone-val').value.trim());
     }
 
-    if (ssRefFile) {
-        formData.append('reference_image', ssRefFile);
-    }
+    if (ssRefFile) formData.append('reference_image', ssRefFile);
 
-    // Show progress
     swatchsetSettings.classList.add('hidden');
     progressContainer.classList.remove('hidden');
     statusText.innerText = `Generating Swatch Set ${outputFormat.toUpperCase()}...`;
 
     let progress = 0;
     const intervalAnim = setInterval(() => {
-        if (progress < 90) {
-            progress += 10;
-            progressFill.style.width = `${progress}%`;
-        }
+        if (progress < 90) { progress += 10; progressFill.style.width = `${progress}%`; }
     }, 80);
 
     try {
-        const response = await fetch('/swatchset', { method: 'POST', body: formData });
-        const data = await response.json();
+        const response = await fetch('/swatchset', {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: formData
+        });
 
         clearInterval(intervalAnim);
+
+        const handled = await handleAuthError(response);
+        if (handled) return;
+
+        const data = await response.json();
         progressFill.style.width = '100%';
 
         if (data.status === 'success') {
@@ -367,7 +564,7 @@ swatchsetGenerateBtn.addEventListener('click', async () => {
     }
 });
 
-// Handle EvenOdd Generate Button
+// ── Even/Odd Generate ─────────────────────────────────────────────────────────
 generateBtn.addEventListener('click', async () => {
     const formData = new FormData();
     formData.append('start', evenoddStart.value);
@@ -376,16 +573,11 @@ generateBtn.addEventListener('click', async () => {
 
     evenoddSettings.classList.add('hidden');
     progressContainer.classList.remove('hidden');
-    statusText.innerText = `Generating Numbers...`;
+    statusText.innerText = 'Generating Numbers...';
 
     try {
-        const response = await fetch('/evenodd', {
-            method: 'POST',
-            body: formData
-        });
-
+        const response = await fetch('/evenodd', { method: 'POST', body: formData });
         const data = await response.json();
-        
         progressContainer.classList.add('hidden');
 
         if (data.status === 'success') {
@@ -401,41 +593,38 @@ generateBtn.addEventListener('click', async () => {
     }
 });
 
-// Handle Copy Array
+// ── Copy Button ───────────────────────────────────────────────────────────────
 copyBtn.addEventListener('click', () => {
     stringResult.select();
     document.execCommand("copy");
     copyBtn.innerText = "Copied!";
-    setTimeout(() => {
-        copyBtn.innerText = "Copy to Clipboard";
-    }, 2000);
+    setTimeout(() => { copyBtn.innerText = "Copy to Clipboard"; }, 2000);
 });
 
+// ── Reset UI ──────────────────────────────────────────────────────────────────
 function resetUI() {
     resultContainer.classList.add('hidden');
     progressContainer.classList.add('hidden');
     stringResultContainer.classList.add('hidden');
-    
+    proUpgradePrompt.classList.add('hidden');
+    progressFill.style.width = '0%';
+    fileInput.value = '';
+
     if (currentTool !== 'evenodd' && currentTool !== 'swatchset') {
         dropZone.classList.remove('hidden');
-    } else if (currentTool === 'evenodd') {
-        evenoddSettings.classList.remove('hidden');
-    } else if (currentTool === 'swatchset') {
+    }
+    if (currentTool === 'evenodd') evenoddSettings.classList.remove('hidden');
+    if (currentTool === 'swatchset') {
         swatchsetSettings.classList.remove('hidden');
         ssRefFile = null;
         ssRefName.innerText = '';
         ssRefZone.classList.remove('has-file');
         resetBtn.textContent = 'Process Another';
     }
-
-    fileInput.value = '';
-    progressFill.style.width = '0%';
-    
-    if (currentTool === 'insertbetween') {
-        insertSettings.classList.remove('hidden');
-    } else if (currentTool === 'cropper') {
-        cropperSettings.classList.remove('hidden');
-    } else if (currentTool === 'vectorizer') {
-        vectorizerSettings.classList.remove('hidden');
-    }
+    if (currentTool === 'insertbetween') insertSettings.classList.remove('hidden');
+    if (currentTool === 'cropper') cropperSettings.classList.remove('hidden');
+    if (currentTool === 'vectorizer') vectorizerSettings.classList.remove('hidden');
 }
+
+// ── Start ─────────────────────────────────────────────────────────────────────
+initApp();

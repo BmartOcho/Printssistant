@@ -6,6 +6,7 @@
     <title>Printssistant | Professional Printing Utilities</title>
     <link rel="stylesheet" href="static/style.css" />
     <script src="https://js.stripe.com/v3/"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -20,13 +21,35 @@
       <div class="blob blob-3"></div>
     </div>
 
+    <!-- Auth Modal -->
+    <div id="auth-modal" class="auth-modal-overlay hidden">
+      <div class="auth-card glass">
+        <h2 id="auth-modal-title">Sign In</h2>
+        <p id="auth-modal-subtitle">Access your Printssistant tools</p>
+        <div class="auth-form">
+          <input type="email" id="auth-email" class="glass-input auth-input" placeholder="Email address" autocomplete="email" />
+          <input type="password" id="auth-password" class="glass-input auth-input" placeholder="Password" autocomplete="current-password" />
+          <button id="auth-submit-btn" class="btn-primary auth-submit">Sign In</button>
+          <p class="auth-toggle-text">
+            Don't have an account? <a id="auth-toggle-link" href="#" class="auth-toggle-link">Create one free</a>
+          </p>
+          <p id="auth-error" class="auth-error hidden"></p>
+        </div>
+      </div>
+    </div>
+
     <main>
       <header>
         <h1>Printssistant<span>.</span></h1>
         <p>Professional Utilities for Modern Printing</p>
+        <!-- User Status Bar -->
+        <div id="user-bar" class="user-bar hidden">
+          <span id="user-info-text" class="user-info-text"></span>
+          <button id="logout-btn" class="btn-logout">Sign Out</button>
+        </div>
       </header>
 
-      <!-- Printssistant Pro CTA -->
+      <!-- Printssistant Pro CTA (hidden for Pro users) -->
       <a
         id="pro-cta"
         href="https://buy.stripe.com/28EfZhgAG7XHdq1gwc1B600"
@@ -39,25 +62,32 @@
         <p class="pro-cta-sub">Get all the features for life. No limits. Ever.</p>
       </a>
 
-
       <div class="tool-selector glass">
         <button class="tab-btn active" data-tool="duplexer">Duplexer</button>
-        <button class="tab-btn" data-tool="insertbetween">
-          Insert Between
-        </button>
+        <button class="tab-btn" data-tool="insertbetween">Insert Between</button>
         <button class="tab-btn" data-tool="evenodd">Even/Odd Gen</button>
         <button class="tab-btn" data-tool="cropper">Auto-Cropper</button>
-        <button class="tab-btn" data-tool="vectorizer">Vectorizer</button>
-        <button class="tab-btn" data-tool="swatchset">Swatch Set</button>
+        <button class="tab-btn pro-tab" data-tool="vectorizer">Vectorizer <span class="pro-badge">PRO</span></button>
+        <button class="tab-btn pro-tab" data-tool="swatchset">Swatch Set <span class="pro-badge">PRO</span></button>
       </div>
 
       <section class="tool-card glass">
+
+        <!-- Pro Upgrade Prompt (shown when non-pro user clicks a pro tool) -->
+        <div id="pro-upgrade-prompt" class="hidden">
+          <div class="pro-lock-icon">🔒</div>
+          <h3>Printssistant Pro Feature</h3>
+          <p style="opacity:0.7; margin: 0.75rem 0 1.5rem;">Unlock the Vectorizer and Swatch Set — plus unlimited use of all tools. One-time payment, lifetime access.</p>
+          <a href="https://buy.stripe.com/28EfZhgAG7XHdq1gwc1B600" target="_blank" rel="noopener noreferrer" class="btn-primary">
+            Upgrade to Pro — Lifetime Access
+          </a>
+        </div>
+
         <!-- Tool Specific Settings -->
         <div id="tool-settings-insert" class="settings-panel hidden">
           <h3>Insert Options</h3>
           <p class="settings-desc">
-            Upload the Single Page PDF to insert between the pages of your main
-            document.
+            Upload the Single Page PDF to insert between the pages of your main document.
           </p>
           <div class="upload-area sub-upload" id="insert-file-zone">
             <p>Drag & Drop Insert PDF</p>
@@ -66,54 +96,28 @@
           </div>
           <div class="input-group">
             <label for="interval-input">Interval (Pages)</label>
-            <input
-              type="number"
-              id="interval-input"
-              value="1"
-              min="1"
-              class="glass-input"
-            />
+            <input type="number" id="interval-input" value="1" min="1" class="glass-input" />
           </div>
         </div>
 
         <!-- Auto-Cropper Settings -->
         <div id="tool-settings-cropper" class="settings-panel hidden">
           <h3>Crop Settings</h3>
-          <p class="settings-desc">
-            Specify how many rows and columns to split each page into.
-          </p>
-
+          <p class="settings-desc">Specify how many rows and columns to split each page into.</p>
           <div class="input-group" style="margin-bottom: 1rem">
             <label for="cropper-rows">Rows</label>
-            <input
-              type="number"
-              id="cropper-rows"
-              value="2"
-              min="1"
-              class="glass-input"
-            />
+            <input type="number" id="cropper-rows" value="2" min="1" class="glass-input" />
           </div>
-
           <div class="input-group">
             <label for="cropper-cols">Columns</label>
-            <input
-              type="number"
-              id="cropper-cols"
-              value="2"
-              min="1"
-              class="glass-input"
-            />
+            <input type="number" id="cropper-cols" value="2" min="1" class="glass-input" />
           </div>
         </div>
 
         <!-- Even/Odd Generator Settings -->
         <div id="tool-settings-evenodd" class="settings-panel hidden">
           <h3>Generate Number Sequence</h3>
-          <p class="settings-desc">
-            Generate a comma separated list of numbers for InDesign Parent
-            Pages.
-          </p>
-
+          <p class="settings-desc">Generate a comma separated list of numbers for InDesign Parent Pages.</p>
           <div class="input-group" style="margin-bottom: 1rem">
             <label for="evenodd-type">Number Type</label>
             <select id="evenodd-type" class="glass-input">
@@ -121,34 +125,15 @@
               <option value="odd">Odd (1, 3, 5...)</option>
             </select>
           </div>
-
           <div class="input-group" style="margin-bottom: 1rem">
             <label for="evenodd-start">Start Range</label>
-            <input
-              type="number"
-              id="evenodd-start"
-              value="1"
-              min="1"
-              class="glass-input"
-            />
+            <input type="number" id="evenodd-start" value="1" min="1" class="glass-input" />
           </div>
-
           <div class="input-group">
             <label for="evenodd-end">End Range</label>
-            <input
-              type="number"
-              id="evenodd-end"
-              value="10"
-              min="1"
-              class="glass-input"
-            />
+            <input type="number" id="evenodd-end" value="10" min="1" class="glass-input" />
           </div>
-
-          <button
-            id="evenodd-generate-btn"
-            class="btn-primary"
-            style="margin-top: 1.5rem; width: 100%"
-          >
+          <button id="evenodd-generate-btn" class="btn-primary" style="margin-top: 1.5rem; width: 100%">
             Generate Numbers
           </button>
         </div>
@@ -156,9 +141,7 @@
         <!-- Vectorizer Settings -->
         <div id="tool-settings-vectorizer" class="settings-panel hidden">
           <h3>Vectorizer Presets</h3>
-          <p class="settings-desc">
-            Select the preset to trace your raster image into scalable vector graphics.
-          </p>
+          <p class="settings-desc">Select the preset to trace your raster image into scalable vector graphics.</p>
           <div class="input-group">
             <label for="vectorizer-preset">Tracing Preset</label>
             <select id="vectorizer-preset" class="glass-input">
@@ -172,11 +155,8 @@
         <div id="tool-settings-swatchset" class="settings-panel hidden">
           <h3>Swatch Set Creator</h3>
           <p class="settings-desc">
-            Generate a printable CMYK swatch comparison PDF to show your
-            customer what's achievable between their current color and goal.
+            Generate a printable CMYK swatch comparison PDF to show your customer what's achievable between their current color and goal.
           </p>
-
-          <!-- Baseline CMYK -->
           <h4 class="swatchset-subhead">Baseline CMYK (Current Printed Color)</h4>
           <div class="swatchset-cmyk-row">
             <div class="swatchset-cmyk-field">
@@ -196,8 +176,6 @@
               <input type="number" id="ss-base-k" class="glass-input swatchset-num" value="0" min="0" max="100" />
             </div>
           </div>
-
-          <!-- Goal Color -->
           <h4 class="swatchset-subhead" style="margin-top: 1.25rem">Customer's Goal Color</h4>
           <div class="swatchset-radio-row">
             <label class="swatchset-radio-label">
@@ -210,7 +188,6 @@
               <input type="radio" name="ss-goal-type" value="pantone" /> Pantone
             </label>
           </div>
-
           <div id="ss-goal-rgb-inputs" class="swatchset-cmyk-row">
             <div class="swatchset-cmyk-field">
               <label for="ss-goal-r">R</label>
@@ -225,33 +202,20 @@
               <input type="number" id="ss-goal-b" class="glass-input swatchset-num" value="0" min="0" max="255" />
             </div>
           </div>
-
           <div id="ss-goal-hex-inputs" class="hidden">
-            <input type="text" id="ss-goal-hex-val" class="glass-input"
-              style="width: 130px; text-align: left; padding-left: 0.5rem"
-              placeholder="#FF5733" maxlength="7" />
+            <input type="text" id="ss-goal-hex-val" class="glass-input" style="width: 130px; text-align: left; padding-left: 0.5rem" placeholder="#FF5733" maxlength="7" />
           </div>
-
           <div id="ss-goal-pantone-inputs" class="hidden">
-            <input type="text" id="ss-goal-pantone-val" class="glass-input"
-              style="width: 180px; text-align: left; padding-left: 0.5rem"
-              placeholder="485 C" />
+            <input type="text" id="ss-goal-pantone-val" class="glass-input" style="width: 180px; text-align: left; padding-left: 0.5rem" placeholder="485 C" />
           </div>
-
-          <!-- Optional Reference Image -->
           <h4 class="swatchset-subhead" style="margin-top: 1.25rem">
-            Reference Image
-            <span style="font-weight: 400; opacity: 0.55">(Optional)</span>
+            Reference Image <span style="font-weight: 400; opacity: 0.55">(Optional)</span>
           </h4>
           <div class="upload-area sub-upload" id="ss-ref-zone" style="padding: 0.75rem">
-            <p style="font-size: 0.85rem; margin: 0; opacity: 0.8">
-              Click or drop a logo / swatch photo to embed in the PDF
-            </p>
+            <p style="font-size: 0.85rem; margin: 0; opacity: 0.8">Click or drop a logo / swatch photo to embed in the PDF</p>
             <input type="file" id="ss-ref-input" hidden accept=".png,.jpg,.jpeg" />
             <span id="ss-ref-name" class="file-name"></span>
           </div>
-
-          <!-- Output Format -->
           <h4 class="swatchset-subhead" style="margin-top: 1.25rem">Output Format</h4>
           <div class="swatchset-radio-row">
             <label class="swatchset-radio-label">
@@ -261,7 +225,6 @@
               <input type="radio" name="ss-format" value="eps" /> EPS — Legacy Vector
             </label>
           </div>
-
           <button id="swatchset-generate-btn" class="btn-primary" style="margin-top: 1.5rem; width: 100%">
             Generate Swatch Set PDF
           </button>
@@ -284,21 +247,8 @@
 
         <div id="string-result-container" class="hidden">
           <h3 style="margin-bottom: 1rem">Generated Numbers</h3>
-          <textarea
-            id="string-result"
-            class="glass-input"
-            style="
-              width: 100%;
-              height: 100px;
-              resize: none;
-              text-align: left;
-              padding: 1rem;
-            "
-            readonly
-          ></textarea>
-          <button id="copy-btn" class="btn-primary" style="margin-top: 1rem">
-            Copy to Clipboard
-          </button>
+          <textarea id="string-result" class="glass-input" style="width: 100%; height: 100px; resize: none; text-align: left; padding: 1rem;" readonly></textarea>
+          <button id="copy-btn" class="btn-primary" style="margin-top: 1rem">Copy to Clipboard</button>
         </div>
 
         <div id="result-container" class="hidden">
@@ -307,6 +257,7 @@
           <a href="#" id="download-link" class="btn-primary">Download Result</a>
           <button id="reset-btn" class="btn-secondary">Process Another</button>
         </div>
+
       </section>
 
       <footer>
