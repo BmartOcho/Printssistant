@@ -29,6 +29,10 @@ except ImportError as e:
     resend_available = False
     print(f"❌ Failed to import resend: {e}")
 
+# Debug: Check if RESEND_API_KEY is available
+print(f"[STARTUP] RESEND_API_KEY loaded: {bool(os.environ.get('RESEND_API_KEY'))}")
+print(f"[STARTUP] Checking variable name: RESEND_API_KEY")
+
 app = FastAPI(title="Printssistant API")
 
 app.add_middleware(
