@@ -71,6 +71,7 @@ const authPassword        = document.getElementById('auth-password');
 const authSubmitBtn       = document.getElementById('auth-submit-btn');
 const authToggleLink      = document.getElementById('auth-toggle-link');
 const authError           = document.getElementById('auth-error');
+const forgotPasswordText  = document.getElementById('forgot-password-text');
 
 let currentTool = 'duplexer';
 let insertFile = null;
@@ -195,8 +196,6 @@ function showFreeLimitReached() {
 }
 
 // ── Auth Modal Events ─────────────────────────────────────────────────────────
-const forgotPasswordText = document.getElementById('forgot-password-text');
-
 authToggleLink.addEventListener('click', (e) => {
     e.preventDefault();
     authMode = authMode === 'signin' ? 'signup' : 'signin';
