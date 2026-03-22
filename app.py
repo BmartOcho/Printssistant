@@ -102,7 +102,9 @@ async def signin(request: Request):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     user = result.data[0]
-    if not user.get("password_hash") or not pwd_context.verify(password, user["password_hash"]):
+    verify_result = pwd_context.verify(password, user["password_hash"]) if user.get("password_hash") else False
+    print(f"[DEBUG] Password verify result for {email}: {verify_result}")
+    if not user.get("password_hash") or not verify_result:
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     token = create_access_token(user["id"], email)
