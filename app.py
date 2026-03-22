@@ -90,6 +90,16 @@ async def read_index():
     return FileResponse(BASE_DIR / "static" / "index.html")
 
 
+@app.get("/forgot-password")
+async def forgot_password_page():
+    return FileResponse(BASE_DIR / "static" / "forgot-password.html")
+
+
+@app.get("/reset-password")
+async def reset_password_page():
+    return FileResponse(BASE_DIR / "static" / "reset-password.html")
+
+
 # ── Auth ─────────────────────────────────────────────────────────────────────
 
 @app.post("/auth/signup")
