@@ -23,8 +23,10 @@ from passlib.context import CryptContext
 try:
     from resend import Resend
     resend_available = True
-except ImportError:
+    print("✅ Resend library imported successfully")
+except ImportError as e:
     resend_available = False
+    print(f"❌ Failed to import Resend: {e}")
 
 app = FastAPI(title="Printssistant API")
 
@@ -200,10 +202,13 @@ async def forgot_password(request: Request):
     # Send email via Resend (if API key is available)
     reset_url = f"https://printssistant.com/reset-password?token={token}"
     
+    print(f"[DEBUG] resend_available: {resend_available}, RESEND_API_KEY set: {bool(os.environ.get('RESEND_API_KEY'))}")
+    
     if resend_available and os.environ.get("RESEND_API_KEY"):
         try:
+            print(f"[DEBUG] Attempting to send reset email to {email}")
             client = Resend(api_key=os.environ.get("RESEND_API_KEY"))
-            client.emails.send({
+            result = client.emails.send({
                 "from": "noreply@printssistant.com",
                 "to": email,
                 "subject": "Reset Your Printssistant Password",
@@ -216,11 +221,13 @@ async def forgot_password(request: Request):
                 <p>—<br>Printssistant Team</p>
                 """,
             })
+            print(f"[DEBUG] Email sent successfully: {result}")
         except Exception as e:
-            print(f"Error sending reset email: {e}")
+            print(f"❌ Error sending reset email: {type(e).__name__}: {e}")
     else:
+        print(f"⚠️  Resend not configured (available={resend_available}, has_key={bool(os.environ.get('RESEND_API_KEY'))})")
         print(f"⚠️  Reset token for {email}: {reset_url}")
-        print("(Resend not configured. Copy the link above to test.)")
+        print("(Copy the link above to test.)")
 
     return {"message": "If an account with that email exists, a reset link has been sent."}
 
