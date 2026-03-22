@@ -21,10 +21,10 @@ from db import supabase, increment_job_count
 from passlib.context import CryptContext
 
 try:
-    from resend import Resend
+    from resend.client import Resend
     resend_available = True
     print("✅ Resend library imported successfully")
-except ImportError as e:
+except (ImportError, AttributeError) as e:
     resend_available = False
     print(f"❌ Failed to import Resend: {e}")
 
