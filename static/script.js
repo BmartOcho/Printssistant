@@ -126,6 +126,8 @@ function handleSignOut() {
 function showAuthModal() {
     authModal.classList.remove('hidden');
     authEmail.focus();
+    // Show forgot password link (only visible in signin mode)
+    forgotPasswordText.style.display = authMode === 'signin' ? 'block' : 'none';
 }
 
 // Dismiss auth modal by clicking the overlay background
@@ -193,6 +195,8 @@ function showFreeLimitReached() {
 }
 
 // ── Auth Modal Events ─────────────────────────────────────────────────────────
+const forgotPasswordText = document.getElementById('forgot-password-text');
+
 authToggleLink.addEventListener('click', (e) => {
     e.preventDefault();
     authMode = authMode === 'signin' ? 'signup' : 'signin';
@@ -202,12 +206,14 @@ authToggleLink.addEventListener('click', (e) => {
         authSubmitBtn.textContent = 'Create Account';
         authToggleLink.textContent = 'Sign in instead';
         authToggleLink.previousSibling.textContent = 'Already have an account? ';
+        forgotPasswordText.style.display = 'none'; // Hide forgot password in signup mode
     } else {
         authModalTitle.textContent = 'Sign In';
         authModalSubtitle.textContent = 'Access your Printssistant tools';
         authSubmitBtn.textContent = 'Sign In';
         authToggleLink.textContent = 'Create one free';
         authToggleLink.previousSibling.textContent = "Don't have an account? ";
+        forgotPasswordText.style.display = 'block'; // Show forgot password in signin mode
     }
     authError.classList.add('hidden');
 });

@@ -1,6 +1,8 @@
 import os
 import shutil
 import zipfile
+import secrets
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 from fastapi import FastAPI, UploadFile, File, BackgroundTasks, Form, HTTPException, Depends, Request
@@ -18,6 +20,12 @@ from auth import get_current_user, require_pro, check_free_limit, create_access_
 from db import supabase, increment_job_count
 from passlib.context import CryptContext
 
+try:
+    from resend import Resend
+    resend_available = True
+except ImportError:
+    resend_available = False
+
 app = FastAPI(title="Printssistant API")
 
 app.add_middleware(
@@ -29,6 +37,36 @@ app.add_middleware(
 )
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+# ── Password Reset Setup ─────────────────────────────────────────────────────
+
+def initialize_password_resets_table():
+    """Create password_resets table if it doesn't exist."""
+    try:
+        supabase.table("password_resets").select("id").limit(1).execute()
+    except Exception as e:
+        # Table doesn't exist, create it
+        try:
+            # Note: This uses the Supabase REST API directly via supabase.postgrest
+            # You may need to create this table manually in Supabase if this fails
+            supabase.postgrest.from_("password_resets").select("*").execute()
+        except:
+            print(
+                "⚠️  password_resets table not found. Create it manually in Supabase with:\n"
+                "  - email (text, unique)\n"
+                "  - token (text, unique)\n"
+                "  - expires_at (timestamp)\n"
+                "  - used (boolean, default false)\n"
+                "  - created_at (timestamp, default now())"
+            )
+
+
+# Call on startup
+@app.on_event("startup")
+async def startup():
+    initialize_password_resets_table()
+
 
 # Setup directories
 import tempfile
@@ -114,6 +152,147 @@ async def signin(request: Request):
         "is_pro": user.get("is_pro", False),
         "monthly_jobs": user.get("monthly_jobs", 0),
     }
+
+
+# ── Password Reset ───────────────────────────────────────────────────────────
+
+@app.post("/auth/forgot-password")
+async def forgot_password(request: Request):
+    """Send a password reset email to the user."""
+    body = await request.json()
+    email = body.get("email", "").strip().lower()
+
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required")
+
+    # Check if user exists
+    result = supabase.table("users").select("id, email").eq("email", email).execute()
+    if not result.data:
+        # Don't leak whether email exists — return success anyway
+        return {"message": "If an account with that email exists, a reset link has been sent."}
+
+    # Generate a secure token (32 bytes = 64 hex chars)
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.utcnow() + timedelta(hours=1)
+
+    # Store the token in the password_resets table
+    try:
+        supabase.table("password_resets").insert({
+            "email": email,
+            "token": token,
+            "expires_at": expires_at.isoformat(),
+            "used": False,
+        }).execute()
+    except Exception as e:
+        print(f"Error storing password reset token: {e}")
+        return {"message": "If an account with that email exists, a reset link has been sent."}
+
+    # Send email via Resend (if API key is available)
+    reset_url = f"https://printssistant.com/reset-password?token={token}"
+    
+    if resend_available and os.environ.get("RESEND_API_KEY"):
+        try:
+            client = Resend(api_key=os.environ.get("RESEND_API_KEY"))
+            client.emails.send({
+                "from": "noreply@printssistant.com",
+                "to": email,
+                "subject": "Reset Your Printssistant Password",
+                "html": f"""
+                <p>Hi,</p>
+                <p>You requested a password reset for your Printssistant account. Click the link below to set a new password:</p>
+                <p><a href="{reset_url}">Reset Password</a></p>
+                <p>This link expires in 1 hour.</p>
+                <p>If you didn't request this, you can ignore this email.</p>
+                <p>—<br>Printssistant Team</p>
+                """,
+            })
+        except Exception as e:
+            print(f"Error sending reset email: {e}")
+    else:
+        print(f"⚠️  Reset token for {email}: {reset_url}")
+        print("(Resend not configured. Copy the link above to test.)")
+
+    return {"message": "If an account with that email exists, a reset link has been sent."}
+
+
+@app.get("/auth/reset-password/{token}")
+async def validate_reset_token(token: str):
+    """Validate that a reset token exists and hasn't expired."""
+    try:
+        result = supabase.table("password_resets").select("email, expires_at, used").eq("token", token).execute()
+        
+        if not result.data:
+            raise HTTPException(status_code=400, detail="Invalid or expired reset link")
+        
+        reset = result.data[0]
+        
+        if reset.get("used"):
+            raise HTTPException(status_code=400, detail="This reset link has already been used")
+        
+        expires_at = datetime.fromisoformat(reset["expires_at"].replace("Z", "+00:00"))
+        if datetime.utcnow() > expires_at:
+            raise HTTPException(status_code=400, detail="This reset link has expired")
+        
+        return {"valid": True, "email": reset["email"]}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error validating reset token: {e}")
+        raise HTTPException(status_code=400, detail="Invalid reset link")
+
+
+@app.post("/auth/reset-password")
+async def reset_password(request: Request):
+    """Update the user's password using a valid reset token."""
+    body = await request.json()
+    token = body.get("token", "")
+    new_password = body.get("password", "")
+
+    if not token or not new_password:
+        raise HTTPException(status_code=400, detail="Token and password are required")
+    
+    if len(new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+
+    # Validate the token
+    try:
+        result = supabase.table("password_resets").select("email, expires_at, used").eq("token", token).execute()
+        
+        if not result.data:
+            raise HTTPException(status_code=400, detail="Invalid reset token")
+        
+        reset = result.data[0]
+        
+        if reset.get("used"):
+            raise HTTPException(status_code=400, detail="This reset link has already been used")
+        
+        expires_at = datetime.fromisoformat(reset["expires_at"].replace("Z", "+00:00"))
+        if datetime.utcnow() > expires_at:
+            raise HTTPException(status_code=400, detail="This reset link has expired")
+        
+        email = reset["email"]
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error validating reset token: {e}")
+        raise HTTPException(status_code=400, detail="Invalid reset token")
+
+    # Update the user's password
+    try:
+        new_hash = pwd_context.hash(new_password[:72])
+        supabase.table("users").update({
+            "password_hash": new_hash,
+        }).eq("email", email).execute()
+
+        # Mark the token as used
+        supabase.table("password_resets").update({
+            "used": True,
+        }).eq("token", token).execute()
+
+        return {"message": "Password updated successfully"}
+    except Exception as e:
+        print(f"Error updating password: {e}")
+        raise HTTPException(status_code=500, detail="Error updating password")
 
 
 @app.get("/auth/me")
