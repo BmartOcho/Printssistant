@@ -20,13 +20,14 @@ from auth import get_current_user, require_pro, check_free_limit, create_access_
 from db import supabase, increment_job_count
 from passlib.context import CryptContext
 
+resend_client = None
 try:
-    from resend.client import Resend
+    import resend
     resend_available = True
     print("✅ Resend library imported successfully")
-except (ImportError, AttributeError) as e:
+except ImportError as e:
     resend_available = False
-    print(f"❌ Failed to import Resend: {e}")
+    print(f"❌ Failed to import resend: {e}")
 
 app = FastAPI(title="Printssistant API")
 
@@ -207,8 +208,8 @@ async def forgot_password(request: Request):
     if resend_available and os.environ.get("RESEND_API_KEY"):
         try:
             print(f"[DEBUG] Attempting to send reset email to {email}")
-            client = Resend(api_key=os.environ.get("RESEND_API_KEY"))
-            result = client.emails.send({
+            resend.api_key = os.environ.get("RESEND_API_KEY")
+            result = resend.Emails.send({
                 "from": "noreply@printssistant.com",
                 "to": email,
                 "subject": "Reset Your Printssistant Password",
