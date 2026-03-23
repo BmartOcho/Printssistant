@@ -54,8 +54,6 @@ const userBar             = document.getElementById('user-bar');
 const userInfoText        = document.getElementById('user-info-text');
 const logoutBtn           = document.getElementById('logout-btn');
 const proCta              = document.getElementById('pro-cta');
-const signInBar           = document.getElementById('sign-in-bar');
-const signInLink          = document.getElementById('sign-in-link');
 const navSignInLink       = document.getElementById('nav-sign-in');
 
 // Tools that require login (free tier)
@@ -121,7 +119,6 @@ function handleSignOut() {
     localStorage.removeItem(TOKEN_KEY);
     currentUser = null;
     userBar.classList.add('hidden');
-    signInBar.classList.remove('hidden');
     proCta.style.display = '';
 }
 
@@ -147,14 +144,12 @@ function hideAuthModal() {
 
 function updateUIForAuthState() {
     if (!currentUser) {
-        // Not logged in — show sign-in link, hide user bar
-        signInBar.classList.remove('hidden');
+        // Not logged in — hide user bar
         userBar.classList.add('hidden');
         return;
     }
 
-    // Logged in — hide sign-in link, show user bar
-    signInBar.classList.add('hidden');
+    // Logged in — show user bar
     userBar.classList.remove('hidden');
 
     if (currentUser.is_pro) {
@@ -266,11 +261,6 @@ function showAuthError(msg) {
 }
 
 // ── Sign-In Link ──────────────────────────────────────────────────────────────
-signInLink.addEventListener('click', (e) => {
-    e.preventDefault();
-    showAuthModal();
-});
-
 navSignInLink.addEventListener('click', (e) => {
     e.preventDefault();
     showAuthModal();
