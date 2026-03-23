@@ -3,12 +3,15 @@ Vectorizer Presets - Three engine-native presets with learned settings support.
 1. Laser Engraving (B&W) - VTracer binary mode for general B&W vectorization
 2. Full Color - VTracer color mode with stacked hierarchical layering
 3. High Precision B&W - Potrace for sharp edges on logos, text, laser/vinyl
+
+Includes smart preset suggestion based on image analysis.
 """
 
 import copy
 import json
 import os
 import logging
+from typing import Dict, List, Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -160,3 +163,152 @@ def list_presets():
         presets.append(info)
 
     return presets
+
+
+# ─── Smart Preset Routing ──────────────────────────────────────────
+
+def suggest_preset(image_analysis: Dict[str, Any]) -> List[str]:
+    """
+    Suggest optimal preset(s) based on image characteristics.
+
+    Uses image analysis (saturation, transparency, content brightness) to recommend
+    the best vectorization preset. Returns presets ranked by recommendation.
+
+    Args:
+        image_analysis: Dict with keys:
+            - has_alpha: bool, whether image has transparency
+            - content_is_light: bool, whether opaque content is predominantly light
+            - width: int, image width in pixels
+            - height: int, image height in pixels
+            - detected_mode_suggestion: str, initial suggestion ("bw", "color", "high_precision_bw")
+
+    Returns:
+        List[str]: Preset keys ranked by recommendation priority.
+                   Example: ["high_precision_bw", "laser_bw", "full_color"]
+    """
+    suggestions = []
+    width = image_analysis.get("width", 0)
+    height = image_analysis.get("height", 0)
+    has_alpha = image_analysis.get("has_alpha", False)
+    suggested_mode = image_analysis.get("detected_mode_suggestion", "bw")
+
+    # Primary logic: transparent + B&W = high_precision_bw is ideal
+    if has_alpha and suggested_mode in ("bw", "high_precision_bw"):
+        suggestions.append("high_precision_bw")
+
+    # If mode suggestion is color-rich, recommend full_color
+    if suggested_mode == "color":
+        suggestions.append("full_color")
+
+    # Always include B&W options for fallback
+    if "high_precision_bw" not in suggestions:
+        suggestions.append("high_precision_bw")
+
+    if "laser_bw" not in suggestions:
+        suggestions.append("laser_bw")
+
+    # Add full_color if not already present
+    if "full_color" not in suggestions:
+        suggestions.append("full_color")
+
+    # Trim to top 3 suggestions
+    return suggestions[:3]
+
+
+def analyze_image_characteristics(
+    image_bytes: bytes,
+) -> Dict[str, Any]:
+    """
+    Analyze image bytes to extract vectorization-relevant characteristics.
+
+    Examines color saturation, transparency, and brightness to determine
+    the best preset and provide user guidance.
+
+    Args:
+        image_bytes: Raw image data as bytes (PNG or JPEG)
+
+    Returns:
+        Dict with keys:
+            - has_alpha: bool
+            - content_is_light: bool
+            - detected_saturation: float (0-255 scale)
+            - color_count_estimate: int
+            - suggested_mode: str ("bw", "color", "high_precision_bw")
+    """
+    try:
+        import cv2
+        import numpy as np
+
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED)
+
+        if img is None:
+            logger.warning("Could not decode image for analysis")
+            return _default_image_analysis()
+
+        has_alpha = len(img.shape) == 3 and img.shape[2] == 4
+        content_is_light = False
+
+        # Analyze brightness if alpha channel exists
+        if has_alpha:
+            alpha = img[:, :, 3]
+            bgr = img[:, :, :3]
+            opaque_mask = alpha > 128
+            if opaque_mask.any():
+                gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+                content_is_light = gray[opaque_mask].mean() > 170
+        else:
+            if len(img.shape) == 3:
+                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            else:
+                gray = img
+            content_is_light = gray.mean() > 170
+
+        # Analyze saturation and color count
+        if len(img.shape) == 3 and img.shape[2] >= 3:
+            bgr = img[:, :, :3]
+            hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
+            saturation = hsv[:, :, 1]
+            avg_saturation = saturation.mean()
+
+            # Estimate distinct colors by downsampling and clustering
+            small = cv2.resize(hsv, (50, 50))
+            reshaped = small.reshape(-1, 3)
+            unique_colors = len(np.unique(reshaped, axis=0))
+        else:
+            avg_saturation = 0.0
+            unique_colors = 2
+
+        # Determine suggested mode based on saturation and colors
+        if avg_saturation < 30:  # Low saturation = mostly B&W
+            suggested_mode = "high_precision_bw" if has_alpha else "bw"
+        elif unique_colors > 10:  # Rich colors
+            suggested_mode = "color"
+        else:
+            suggested_mode = "bw"
+
+        return {
+            "has_alpha": has_alpha,
+            "content_is_light": content_is_light,
+            "detected_saturation": round(avg_saturation, 1),
+            "color_count_estimate": unique_colors,
+            "suggested_mode": suggested_mode,
+        }
+
+    except ImportError:
+        logger.warning("OpenCV or NumPy not available for image analysis")
+        return _default_image_analysis()
+    except Exception as e:
+        logger.warning(f"Image analysis failed: {str(e)}")
+        return _default_image_analysis()
+
+
+def _default_image_analysis() -> Dict[str, Any]:
+    """Return safe default analysis when analysis fails."""
+    return {
+        "has_alpha": False,
+        "content_is_light": False,
+        "detected_saturation": 0.0,
+        "color_count_estimate": 0,
+        "suggested_mode": "bw",
+    }

@@ -41,7 +41,7 @@ except (ImportError, OSError):
 class VectorizerEngine:
     """Dual-engine vectorizer: VTracer (primary) + Potrace (precision B&W)."""
 
-    def vectorize(self, image_bytes, preset, custom_overrides=None):
+    def vectorize(self, image_bytes, preset, custom_overrides=None, test_mode=False):
         """
         Vectorize a raster image to SVG.
 
@@ -49,51 +49,151 @@ class VectorizerEngine:
             image_bytes: Raw image file bytes (PNG/JPEG)
             preset: Preset configuration dict
             custom_overrides: Optional parameter overrides
+            test_mode: If True, return detailed diagnostics (processing times per engine,
+                      engine selection info, color palette, transparency decisions)
 
         Returns:
-            dict with 'svg', 'preview_bw' (base64 PNG), 'stats'
+            dict with 'svg', 'preview_bw' (base64 PNG), 'stats', and optionally 'diagnostics'
         """
         config = self._merge_config(preset, custom_overrides)
         start_time = time.time()
+        stages = ["image_load", "analysis", "engine_execution", "svg_validation", "preview_generation"]
+        current_stage = "image_load"
 
-        # 1. Load and prepare image (handle alpha/transparency)
-        png_bytes, has_alpha, content_is_light, width, height = self._prepare_image(
-            image_bytes, config
-        )
+        try:
+            # 1. Load and prepare image (handle alpha/transparency)
+            png_bytes, has_alpha, content_is_light, width, height = self._prepare_image(
+                image_bytes, config
+            )
+            current_stage = "analysis"
 
-        # 2. Route to engine
-        use_potrace = (
-            config.get("high_precision_bw", False)
-            and config.get("vtracer", {}).get("colormode", "color") == "binary"
-            or config.get("high_precision_bw", False)
-        )
+            # 2. Perform image analysis for diagnostics
+            image_analysis = {
+                "has_alpha": has_alpha,
+                "content_is_light": content_is_light,
+                "width": width,
+                "height": height,
+                "detected_mode_suggestion": self._suggest_mode_from_image(
+                    png_bytes, has_alpha, content_is_light
+                ),
+            }
 
-        if use_potrace and HAS_POTRACE:
-            svg_content = self._run_potrace(png_bytes, config, width, height)
-            engine_name = "potrace"
-        else:
-            svg_content = self._run_vtracer(png_bytes, config)
-            engine_name = "vtracer"
+            # 3. Route to engine with fallback chain
+            current_stage = "engine_execution"
+            vtracer_time = None
+            potrace_time = None
+            engine_name = None
+            svg_content = None
 
-        # 3. Extract stats from SVG
-        stats = self._extract_stats(svg_content)
+            # Try VTracer first (primary engine)
+            vtracer_start = time.time()
+            try:
+                svg_content = self._run_vtracer(png_bytes, config)
+                vtracer_time = round(time.time() - vtracer_start, 3)
+                engine_name = "vtracer"
 
-        # 4. Generate preview
-        preview = self._generate_preview(svg_content, png_bytes)
+                # Validate SVG output
+                if not svg_content or not self._is_valid_svg(svg_content):
+                    logger.warning("VTracer returned invalid SVG, attempting fallback to Potrace")
+                    svg_content = None
+            except Exception as e:
+                logger.error(f"VTracer failed: {str(e)}", exc_info=True)
+                svg_content = None
 
-        # 5. Assemble result
-        elapsed = time.time() - start_time
-        stats.update({
-            "processing_time": round(elapsed, 2),
-            "image_width": width,
-            "image_height": height,
-            "engine": engine_name,
-            "has_transparency": has_alpha,
-            "auto_inverted": content_is_light and config.get("alpha_handling", {}).get("invert") == "auto",
-            "mode": config.get("mode", "bw"),
-        })
+            # Fallback to Potrace if VTracer failed and high-precision is desired or required
+            if svg_content is None and HAS_POTRACE:
+                potrace_start = time.time()
+                try:
+                    svg_content = self._run_potrace(png_bytes, config, width, height)
+                    potrace_time = round(time.time() - potrace_start, 3)
+                    engine_name = "potrace"
 
-        return {"svg": svg_content, "preview_bw": preview, "stats": stats}
+                    if not self._is_valid_svg(svg_content):
+                        logger.error("Potrace also returned invalid SVG")
+                        svg_content = None
+                except Exception as e:
+                    logger.error(f"Potrace fallback failed: {str(e)}", exc_info=True)
+                    svg_content = None
+
+            # If both engines failed, raise user-friendly error
+            if svg_content is None:
+                error_msg = self._build_engine_error_message()
+                raise RuntimeError(error_msg)
+
+            current_stage = "svg_validation"
+
+            # 4. Extract stats from SVG
+            stats = self._extract_stats(svg_content)
+
+            # 5. Generate warnings and recommendations
+            warnings = self._generate_warnings(width, height, config, image_analysis)
+            recommendations = self._generate_recommendations(
+                image_analysis, config, stats
+            )
+
+            current_stage = "preview_generation"
+
+            # 6. Generate preview
+            preview = self._generate_preview(svg_content, png_bytes)
+
+            # 7. Assemble result
+            elapsed = time.time() - start_time
+            stats.update({
+                "processing_time": round(elapsed, 2),
+                "image_width": width,
+                "image_height": height,
+                "engine": engine_name,
+                "has_transparency": has_alpha,
+                "auto_inverted": content_is_light and config.get("alpha_handling", {}).get("invert") == "auto",
+                "mode": config.get("mode", "bw"),
+                "warnings": warnings,
+                "recommendations": recommendations,
+                "processing_info": {
+                    "stages": stages,
+                    "current_stage": "complete",
+                    "total_time_seconds": round(elapsed, 2),
+                },
+            })
+
+            result = {"svg": svg_content, "preview_bw": preview, "stats": stats}
+
+            # 8. Add detailed diagnostics if test_mode is enabled
+            if test_mode:
+                color_palette = self._extract_color_palette(svg_content) if engine_name == "vtracer" else []
+                transparency_decision = self._get_transparency_handling_decision(has_alpha, content_is_light, config)
+
+                result["diagnostics"] = {
+                    "processing_time_vtracer": vtracer_time,
+                    "processing_time_potrace": potrace_time,
+                    "engine_actually_used": engine_name,
+                    "color_palette_detected": color_palette,
+                    "transparency_handling_decision": transparency_decision,
+                    "image_analysis": image_analysis,
+                }
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Vectorization failed at stage '{current_stage}': {str(e)}", exc_info=True)
+            error_response = {
+                "svg": None,
+                "preview_bw": None,
+                "stats": {
+                    "error": str(e),
+                    "processing_stage_failed": current_stage,
+                    "processing_info": {
+                        "stages": stages,
+                        "current_stage": current_stage,
+                    },
+                }
+            }
+            if test_mode:
+                error_response["diagnostics"] = {
+                    "processing_time_vtracer": vtracer_time,
+                    "processing_time_potrace": potrace_time,
+                    "engine_actually_used": engine_name,
+                }
+            return error_response
 
     # ═══════════════════════════════════════════════════════════════════
     #  Image Preparation
@@ -256,6 +356,247 @@ class VectorizerEngine:
 
         parts.append("Z")
         return " ".join(parts)
+
+    # ═══════════════════════════════════════════════════════════════════
+    #  Validation & Error Handling
+    # ═══════════════════════════════════════════════════════════════════
+
+    def _is_valid_svg(self, svg_string):
+        """
+        Validate that SVG content is well-formed and contains path data.
+
+        Args:
+            svg_string: SVG content as string
+
+        Returns:
+            True if SVG is valid, False otherwise
+        """
+        if not svg_string or not isinstance(svg_string, str):
+            return False
+
+        try:
+            root = ET.fromstring(svg_string)
+            # Check for paths or other drawing elements
+            ns = {"svg": "http://www.w3.org/2000/svg"}
+            paths = (
+                root.findall(".//svg:path", ns)
+                or root.findall(".//{http://www.w3.org/2000/svg}path")
+                or root.findall(".//path")
+            )
+            return len(paths) > 0
+        except ET.ParseError:
+            return False
+
+    def _build_engine_error_message(self):
+        """
+        Build a user-friendly error message with installation instructions.
+
+        Returns:
+            str: Formatted error message
+        """
+        msg = "Vectorization failed: Both VTracer and fallback engines encountered errors.\n"
+        msg += "To resolve this:\n"
+        msg += "1. VTracer should be installed. Check: `pip list | grep vtracer`\n"
+
+        if not HAS_POTRACE:
+            msg += "2. Potrace is not installed. Install it: `pip install pypotrace`\n"
+        else:
+            msg += "2. Potrace is available but also failed. Check image format and try another preset.\n"
+
+        msg += "3. Ensure your image is a valid PNG or JPEG file.\n"
+        msg += "4. If this persists, contact support with your image file."
+
+        return msg
+
+    # ═══════════════════════════════════════════════════════════════════
+    #  Image Analysis & Diagnostics
+    # ═══════════════════════════════════════════════════════════════════
+
+    def _suggest_mode_from_image(self, png_bytes, has_alpha, content_is_light):
+        """
+        Analyze image and suggest the most appropriate vectorization mode.
+
+        Args:
+            png_bytes: Image as PNG bytes
+            has_alpha: Whether image has alpha channel
+            content_is_light: Whether opaque content is predominantly light
+
+        Returns:
+            str: Suggested mode ("bw", "color", or "high_precision_bw")
+        """
+        try:
+            nparr = np.frombuffer(png_bytes, np.uint8)
+            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            if img is None:
+                return "bw"
+
+            # Convert to HSV for saturation analysis
+            hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+            saturation = hsv[:, :, 1]
+
+            # Low saturation = mostly B&W
+            avg_saturation = saturation.mean()
+            has_rich_colors = avg_saturation > 50  # Arbitrary but reasonable threshold
+
+            # For transparent images with low saturation, high_precision_bw is ideal
+            if has_alpha and not has_rich_colors:
+                return "high_precision_bw"
+
+            # For color-rich images, suggest full_color
+            if has_rich_colors:
+                return "color"
+
+            # Default to B&W for low-saturation images
+            return "bw"
+
+        except Exception as e:
+            logger.warning(f"Image analysis failed: {str(e)}, defaulting to 'bw'")
+            return "bw"
+
+    def _extract_color_palette(self, svg_string):
+        """
+        Extract detected color palette from SVG (relevant for color mode).
+
+        Args:
+            svg_string: SVG content as string
+
+        Returns:
+            list: Array of hex color strings (e.g., ["#FF0000", "#00FF00"])
+        """
+        colors = set()
+        try:
+            root = ET.fromstring(svg_string)
+            ns = {"svg": "http://www.w3.org/2000/svg"}
+
+            # Find all elements with fill or stroke attributes
+            for elem in root.iter():
+                fill = elem.get("fill", "")
+                stroke = elem.get("stroke", "")
+
+                for color_attr in [fill, stroke]:
+                    if color_attr and color_attr not in ("none", "black", "white"):
+                        # Try to normalize to hex format
+                        if color_attr.startswith("#"):
+                            colors.add(color_attr.upper())
+
+            return sorted(list(colors))
+        except Exception as e:
+            logger.warning(f"Color palette extraction failed: {str(e)}")
+            return []
+
+    def _get_transparency_handling_decision(self, has_alpha, content_is_light, config):
+        """
+        Describe how transparency was handled in this vectorization.
+
+        Args:
+            has_alpha: Whether original image had alpha channel
+            content_is_light: Whether opaque content is predominantly light
+            config: Configuration dict
+
+        Returns:
+            str: Decision description
+        """
+        if not has_alpha:
+            return "none"
+
+        invert_mode = config.get("alpha_handling", {}).get("invert", False)
+
+        if invert_mode == "auto":
+            if content_is_light:
+                return "composited_on_dark"
+            else:
+                return "composited_on_light"
+        elif invert_mode:
+            return "auto_inverted"
+        else:
+            return "composited_on_light"
+
+    # ═══════════════════════════════════════════════════════════════════
+    #  Warnings & Recommendations
+    # ═══════════════════════════════════════════════════════════════════
+
+    def _generate_warnings(self, width, height, config, image_analysis):
+        """
+        Generate user-facing warnings about image or processing.
+
+        Args:
+            width: Image width in pixels
+            height: Image height in pixels
+            config: Configuration dict
+            image_analysis: Image analysis results
+
+        Returns:
+            list: Array of warning strings
+        """
+        warnings = []
+
+        # Large image warning
+        total_pixels = width * height
+        if total_pixels > 4_000_000:  # >2000x2000
+            warnings.append(
+                f"Image is very large ({width}x{height}), processing may be slow"
+            )
+
+        # High-precision mode warning
+        if config.get("high_precision_bw", False):
+            warnings.append(
+                "High-precision B&W mode will spend extra time on edge optimization"
+            )
+
+        # Transparent image warning
+        if image_analysis.get("has_alpha"):
+            warnings.append(
+                "Image has transparency; it will be composited onto a solid background"
+            )
+
+        return warnings
+
+    def _generate_recommendations(self, image_analysis, config, stats):
+        """
+        Generate preset recommendations based on detected image characteristics.
+
+        Args:
+            image_analysis: Image analysis results
+            config: Current configuration dict
+            stats: Vectorization stats
+
+        Returns:
+            dict: Recommendations including suggested presets and reasoning
+        """
+        recommendations = {
+            "current_mode": config.get("mode", "unknown"),
+            "suggested_modes": [],
+            "reason": "",
+        }
+
+        # Use the suggest_preset function from presets module
+        try:
+            from presets import suggest_preset
+
+            suggestions = suggest_preset(image_analysis)
+            if suggestions:
+                recommendations["suggested_modes"] = suggestions
+                recommendations["reason"] = self._build_recommendation_reason(suggestions, image_analysis)
+        except (ImportError, Exception) as e:
+            logger.warning(f"Could not generate preset recommendations: {str(e)}")
+
+        return recommendations
+
+    def _build_recommendation_reason(self, suggestions, image_analysis):
+        """Build a human-readable explanation for preset suggestions."""
+        reasons = []
+
+        if "high_precision_bw" in suggestions:
+            reasons.append("Image detected as sharp B&W content (optimal for precision)")
+        if "laser_bw" in suggestions:
+            reasons.append("Image suitable for general B&W engraving")
+        if "full_color" in suggestions:
+            reasons.append("Image detected as color-rich")
+
+        if image_analysis.get("has_alpha"):
+            reasons.append("Transparent background detected")
+
+        return "; ".join(reasons) if reasons else "See suggested presets"
 
     # ═══════════════════════════════════════════════════════════════════
     #  Stats & Preview
