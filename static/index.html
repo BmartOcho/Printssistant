@@ -285,11 +285,18 @@
     <script>
       function adjustForNavbar() {
         const navbar = document.querySelector('.navbar');
-        const navHeight = navbar.getBoundingClientRect().height;
-        document.body.style.paddingTop = navHeight + 'px';
+        if (navbar) {
+          const navHeight = navbar.getBoundingClientRect().height;
+          document.body.style.paddingTop = navHeight + 'px';
+        }
       }
 
-      adjustForNavbar();
+      // Run after DOM is fully loaded
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', adjustForNavbar);
+      } else {
+        adjustForNavbar();
+      }
       window.addEventListener('resize', adjustForNavbar);
     </script>
   </body>
