@@ -80,7 +80,7 @@ body {
   overflow-x: hidden;
   position: relative;
   padding: 2rem 1rem;
-  padding-top: 5rem;
+  padding-top: 8rem;
 }
 
 /* Background Blobs */
@@ -144,7 +144,6 @@ main {
 }
 
 header {
-  margin-top: 1rem;
   margin-bottom: 1rem;
 }
 
