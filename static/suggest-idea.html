@@ -307,6 +307,16 @@
         e.preventDefault();
         alert('Sign in functionality would go here - redirect to home auth modal');
       });
+
+      // Dynamically adjust padding for navbar height
+      function adjustForNavbar() {
+        const navbar = document.querySelector('.navbar');
+        const navHeight = navbar.getBoundingClientRect().height;
+        document.body.style.paddingTop = navHeight + 'px';
+      }
+
+      adjustForNavbar();
+      window.addEventListener('resize', adjustForNavbar);
     </script>
   </body>
 </html>

@@ -283,5 +283,16 @@
         }
       }
     </style>
+
+    <script>
+      function adjustForNavbar() {
+        const navbar = document.querySelector('.navbar');
+        const navHeight = navbar.getBoundingClientRect().height;
+        document.body.style.paddingTop = navHeight + 'px';
+      }
+
+      adjustForNavbar();
+      window.addEventListener('resize', adjustForNavbar);
+    </script>
   </body>
 </html>
