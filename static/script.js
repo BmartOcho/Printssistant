@@ -274,11 +274,6 @@ logoutBtn.addEventListener('click', () => {
 // ── Tab Switching ─────────────────────────────────────────────────────────────
 tabBtns.forEach(btn => {
     btn.addEventListener('click', () => {
-        // Don't allow clicking on coming-soon buttons
-        if (btn.classList.contains('coming-soon')) {
-            return;
-        }
-
         tabBtns.forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         currentTool = btn.dataset.tool;
