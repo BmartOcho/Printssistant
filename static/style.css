@@ -15,6 +15,60 @@
   font-family: "Outfit", sans-serif;
 }
 
+/* Navigation Bar */
+.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--glass-border);
+  z-index: 100;
+  padding: 0.75rem 0;
+}
+
+.nav-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.nav-links {
+  display: flex;
+  gap: 2rem;
+}
+
+.nav-link {
+  color: var(--text-white);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: opacity 0.2s;
+  cursor: pointer;
+}
+
+.nav-link:hover {
+  opacity: 0.7;
+}
+
+.nav-sign-in {
+  color: var(--primary-light);
+  border: 1px solid var(--primary-light);
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.nav-sign-in:hover {
+  background: var(--primary-light);
+  color: white;
+  opacity: 1;
+}
+
 body {
   background: var(--bg-dark);
   color: var(--text-white);
@@ -26,6 +80,7 @@ body {
   overflow-x: hidden;
   position: relative;
   padding: 2rem 1rem;
+  padding-top: 5rem;
 }
 
 /* Background Blobs */

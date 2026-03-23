@@ -107,6 +107,81 @@ async def reset_password_page():
     return FileResponse(BASE_DIR / "static" / "reset-password.html")
 
 
+@app.get("/blog")
+async def blog_page():
+    return FileResponse(BASE_DIR / "static" / "blog.html")
+
+
+@app.get("/suggest-idea")
+async def suggest_idea_page():
+    return FileResponse(BASE_DIR / "static" / "suggest-idea.html")
+
+
+# ── Suggestions API ──────────────────────────────────────────────────────────
+
+@app.post("/api/suggestions")
+async def submit_suggestion(request: Request):
+    """Submit a feature suggestion or tool idea."""
+    try:
+        body = await request.json()
+        
+        # Validate required fields
+        required_fields = ['email', 'title', 'description', 'impact']
+        if not all(field in body for field in required_fields):
+            raise HTTPException(status_code=400, detail="Missing required fields")
+        
+        # Store in Supabase
+        suggestion_data = {
+            "name": body.get("name", "Anonymous"),
+            "email": body.get("email", "").strip().lower(),
+            "title": body.get("title", ""),
+            "description": body.get("description", ""),
+            "impact": body.get("impact", ""),
+            "submitted_at": body.get("submittedAt", datetime.utcnow().isoformat()),
+            "status": "new",
+        }
+        
+        # Try to insert into suggestions table
+        try:
+            supabase.table("suggestions").insert(suggestion_data).execute()
+        except Exception as e:
+            print(f"Error storing suggestion: {e}")
+            # Table might not exist, but don't fail the request
+            print(f"💡 Suggestion received: {suggestion_data['title']} from {suggestion_data['email']}")
+        
+        # Send confirmation email
+        reset_url = f"https://printssistant.com"
+        
+        if resend_available and os.environ.get("RESEND_API_KEY"):
+            try:
+                resend.api_key = os.environ.get("RESEND_API_KEY")
+                resend.Emails.send({
+                    "from": "dev@printssistant.com",
+                    "to": body.get("email", ""),
+                    "subject": "We got your idea! ⚡",
+                    "html": f"""
+                    <p>Hey {body.get('name', 'there')},</p>
+                    <p>Thanks for suggesting <strong>{body.get('title')}</strong>. We read every idea and build based on what matters most to our users.</p>
+                    <p>We'll be in touch if we move forward with this one.</p>
+                    <p>—<br>The Printssistant Team</p>
+                    """,
+                })
+                print(f"Confirmation email sent to {body.get('email', '')}")
+            except Exception as e:
+                print(f"Error sending confirmation email: {e}")
+        
+        return {
+            "message": "Thank you! Your idea has been submitted.",
+            "title": body.get("title", "")
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error processing suggestion: {e}")
+        raise HTTPException(status_code=500, detail="Error processing suggestion")
+
+
 # ── Auth ─────────────────────────────────────────────────────────────────────
 
 @app.post("/auth/signup")

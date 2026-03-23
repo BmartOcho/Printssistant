@@ -56,6 +56,7 @@ const logoutBtn           = document.getElementById('logout-btn');
 const proCta              = document.getElementById('pro-cta');
 const signInBar           = document.getElementById('sign-in-bar');
 const signInLink          = document.getElementById('sign-in-link');
+const navSignInLink       = document.getElementById('nav-sign-in');
 
 // Tools that require login (free tier)
 const AUTH_REQUIRED_TOOLS = ['duplexer', 'insertbetween', 'cropper'];
@@ -266,6 +267,11 @@ function showAuthError(msg) {
 
 // ── Sign-In Link ──────────────────────────────────────────────────────────────
 signInLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    showAuthModal();
+});
+
+navSignInLink.addEventListener('click', (e) => {
     e.preventDefault();
     showAuthModal();
 });

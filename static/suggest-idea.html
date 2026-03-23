@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Suggest an Idea | Printssistant</title>
+    <link rel="stylesheet" href="static/style.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="background-blobs">
+      <div class="blob blob-1"></div>
+      <div class="blob blob-2"></div>
+      <div class="blob blob-3"></div>
+    </div>
+
+    <!-- Navigation Menu -->
+    <nav class="navbar">
+      <div class="nav-container">
+        <div class="nav-links">
+          <a href="/" class="nav-link">Home</a>
+          <a href="/blog" class="nav-link">Blog</a>
+          <a href="/suggest-idea" class="nav-link">Suggest an Idea</a>
+        </div>
+        <a href="#" id="nav-sign-in" class="nav-link nav-sign-in">Sign In</a>
+      </div>
+    </nav>
+
+    <main style="display: flex; align-items: center; justify-content: center; min-height: 100vh; padding-top: 2rem;">
+      <div class="idea-form-container">
+        <h1>Suggest a Tool or Feature</h1>
+        <p class="subtitle">What would make your prepress workflow better?</p>
+
+        <form id="idea-form" class="idea-form">
+          <div class="form-group">
+            <label for="idea-name">Your Name (Optional)</label>
+            <input
+              type="text"
+              id="idea-name"
+              class="form-input"
+              placeholder="Your name"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="idea-email">Your Email</label>
+            <input
+              type="email"
+              id="idea-email"
+              class="form-input"
+              placeholder="your@email.com"
+              required
+            />
+            <small>So we can reach out if we build it.</small>
+          </div>
+
+          <div class="form-group">
+            <label for="idea-title">Idea Title</label>
+            <input
+              type="text"
+              id="idea-title"
+              class="form-input"
+              placeholder="e.g., Batch color space conversion"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="idea-description">Describe the Problem</label>
+            <textarea
+              id="idea-description"
+              class="form-input form-textarea"
+              placeholder="What's the pain point? How would this tool solve it?"
+              rows="6"
+              required
+            ></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="idea-impact">How Often Do You Face This?</label>
+            <select id="idea-impact" class="form-input" required>
+              <option value="">-- Select --</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="sometimes">Sometimes</option>
+            </select>
+          </div>
+
+          <button type="submit" class="btn-submit">Send Idea</button>
+
+          <p id="form-message" class="form-message hidden"></p>
+        </form>
+
+        <p class="footer-note">
+          💡 Every idea helps us build better tools. Thanks for contributing!
+        </p>
+      </div>
+    </main>
+
+    <style>
+      .idea-form-container {
+        background: var(--glass-bg);
+        border: 1px solid var(--glass-border);
+        padding: 2.5rem;
+        border-radius: 12px;
+        max-width: 500px;
+        width: 100%;
+        margin: 0 1rem;
+      }
+
+      .idea-form-container h1 {
+        font-size: 1.8rem;
+        margin-bottom: 0.5rem;
+        background: linear-gradient(135deg, var(--primary), var(--primary-light));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      .subtitle {
+        opacity: 0.8;
+        margin-bottom: 2rem;
+      }
+
+      .form-group {
+        margin-bottom: 1.5rem;
+      }
+
+      .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+        font-size: 0.95rem;
+      }
+
+      .form-input {
+        width: 100%;
+        padding: 0.75rem;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--glass-border);
+        border-radius: 6px;
+        color: var(--text-white);
+        font-family: inherit;
+        font-size: 0.95rem;
+        transition: all 0.2s;
+      }
+
+      .form-input:focus {
+        outline: none;
+        border-color: var(--primary-light);
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .form-textarea {
+        resize: vertical;
+      }
+
+      .form-group small {
+        display: block;
+        margin-top: 0.35rem;
+        opacity: 0.6;
+        font-size: 0.85rem;
+      }
+
+      .btn-submit {
+        width: 100%;
+        padding: 0.85rem;
+        background: linear-gradient(135deg, var(--primary), var(--primary-light));
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: opacity 0.2s;
+      }
+
+      .btn-submit:hover {
+        opacity: 0.9;
+      }
+
+      .btn-submit:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .form-message {
+        margin-top: 1rem;
+        padding: 1rem;
+        border-radius: 6px;
+        text-align: center;
+        font-size: 0.95rem;
+      }
+
+      .form-message.success {
+        background: rgba(16, 185, 129, 0.1);
+        color: #10b981;
+        border: 1px solid rgba(16, 185, 129, 0.3);
+      }
+
+      .form-message.error {
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+      }
+
+      .form-message.hidden {
+        display: none;
+      }
+
+      .footer-note {
+        text-align: center;
+        margin-top: 2rem;
+        opacity: 0.7;
+        font-size: 0.9rem;
+      }
+
+      @media (max-width: 600px) {
+        .idea-form-container {
+          padding: 1.5rem;
+        }
+
+        .idea-form-container h1 {
+          font-size: 1.4rem;
+        }
+      }
+    </style>
+
+    <script>
+      const ideaForm = document.getElementById('idea-form');
+      const formMessage = document.getElementById('form-message');
+
+      ideaForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        formMessage.classList.add('hidden');
+
+        const name = document.getElementById('idea-name').value.trim();
+        const email = document.getElementById('idea-email').value.trim();
+        const title = document.getElementById('idea-title').value.trim();
+        const description = document.getElementById('idea-description').value.trim();
+        const impact = document.getElementById('idea-impact').value;
+
+        if (!email || !title || !description || !impact) {
+          formMessage.textContent = 'Please fill in all required fields.';
+          formMessage.classList.remove('hidden');
+          formMessage.classList.remove('success');
+          formMessage.classList.add('error');
+          return;
+        }
+
+        const submitBtn = ideaForm.querySelector('.btn-submit');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Sending...';
+
+        try {
+          const response = await fetch('/api/suggestions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: name || 'Anonymous',
+              email,
+              title,
+              description,
+              impact,
+              submittedAt: new Date().toISOString(),
+            }),
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.detail || 'Failed to submit idea');
+          }
+
+          formMessage.textContent = 'Thanks! Your idea has been submitted.';
+          formMessage.classList.remove('hidden');
+          formMessage.classList.remove('error');
+          formMessage.classList.add('success');
+
+          // Reset form
+          ideaForm.reset();
+
+          // Hide message after 3 seconds
+          setTimeout(() => {
+            formMessage.classList.add('hidden');
+          }, 3000);
+        } catch (error) {
+          formMessage.textContent = error.message || 'Failed to submit idea. Please try again.';
+          formMessage.classList.remove('hidden');
+          formMessage.classList.remove('success');
+          formMessage.classList.add('error');
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Send Idea';
+        }
+      });
+
+      // Wire up nav sign-in
+      const navSignIn = document.getElementById('nav-sign-in');
+      navSignIn.addEventListener('click', (e) => {
+        e.preventDefault();
+        alert('Sign in functionality would go here - redirect to home auth modal');
+      });
+    </script>
+  </body>
+</html>

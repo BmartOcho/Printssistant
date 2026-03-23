@@ -21,6 +21,18 @@
       <div class="blob blob-3"></div>
     </div>
 
+    <!-- Navigation Menu -->
+    <nav class="navbar">
+      <div class="nav-container">
+        <div class="nav-links">
+          <a href="/" class="nav-link">Home</a>
+          <a href="/blog" class="nav-link">Blog</a>
+          <a href="/suggest-idea" class="nav-link">Suggest an Idea</a>
+        </div>
+        <a href="#" id="nav-sign-in" class="nav-link nav-sign-in">Sign In</a>
+      </div>
+    </nav>
+
     <!-- Auth Modal -->
     <div id="auth-modal" class="auth-modal-overlay hidden">
       <div class="auth-card glass">
@@ -45,11 +57,7 @@
       <header>
         <h1>Printssistant<span>.</span></h1>
         <p>Professional Utilities for Modern Printing</p>
-        <!-- Signed-out: discrete sign-in link -->
-        <div id="sign-in-bar" class="sign-in-bar">
-          <a href="#" id="sign-in-link" class="sign-in-link">Sign In</a>
-        </div>
-        <!-- Signed-in: user status bar -->
+        <!-- Signed-in: user status bar (hidden by default) -->
         <div id="user-bar" class="user-bar hidden">
           <span id="user-info-text" class="user-info-text"></span>
           <button id="logout-btn" class="btn-logout">Sign Out</button>
