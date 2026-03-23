@@ -1,7 +1,8 @@
 """
-Vectorizer Presets - Two simplified presets that load from learned_settings.json.
-1. Laser Engraving (B&W) - Precise black-and-white vector tracing
-2. Full Color - Color-accurate image trace with multi-layer SVG output
+Vectorizer Presets - Three engine-native presets with learned settings support.
+1. Laser Engraving (B&W) - VTracer binary mode for general B&W vectorization
+2. Full Color - VTracer color mode with stacked hierarchical layering
+3. High Precision B&W - Potrace for sharp edges on logos, text, laser/vinyl
 """
 
 import copy
@@ -19,88 +20,72 @@ SETTINGS_FILE = os.path.join(BASE_DIR, "learned_settings.json")
 
 DEFAULT_LASER_BW = {
     "name": "Laser Engraving (B&W)",
-    "description": "Precise black-and-white vectorization optimized for laser engraving. "
-                   "Produces sharp, accurate letter forms and clean paths.",
-    "icon": "⚡",
+    "description": "General-purpose black-and-white vectorization using VTracer. "
+                   "Fast and clean results for most B&W artwork.",
+    "icon": "\u26a1",
     "category": "Laser",
     "mode": "bw",
-    "preprocessing": {
-        "grayscale": True,
-        "denoise": True,
-        "denoise_strength": 10,
-        "sharpen": True,
-        "sharpen_amount": 1.5,
-        "contrast_enhance": True,
-        "contrast_clip_limit": 3.0,
-        "contrast_grid_size": 8,
-        "morphology": "close",
-        "morphology_kernel": 2,
+    "alpha_handling": {
         "invert": "auto",
     },
-    "threshold": {
-        "method": "otsu",
-        "value": 128,
-        "adaptive_block_size": 15,
-        "adaptive_c": 5,
+    "vtracer": {
+        "colormode": "binary",
+        "hierarchical": "stacked",
+        "mode": "spline",
+        "filter_speckle": 4,
+        "corner_threshold": 60,
+        "length_threshold": 4.0,
+        "max_iterations": 10,
+        "splice_threshold": 45,
+        "path_precision": 8,
     },
-    "tracing": {
-        "turd_size": 2,
-        "corner_threshold": 1.0,
-        "optimize_tolerance": 0.2,
-        "smooth": True,
-        "min_contour_area": 50,
-        "simplify_tolerance": 1.5,
-    },
-    "output": {
-        "stroke_color": "#000000",
-        "stroke_width": 0.5,
-        "fill_color": "#000000",
-        "fill_mode": "fill",
-        "background": "transparent",
-    }
 }
 
 DEFAULT_FULL_COLOR = {
     "name": "Full Color",
     "description": "Color-accurate vectorization that preserves the original palette. "
-                   "Eye-droppers colors away from edges to avoid raster noise.",
-    "icon": "🎨",
+                   "Uses VTracer's native color quantization and stacked layering.",
+    "icon": "\U0001f3a8",
     "category": "Color",
     "mode": "color",
+    "alpha_handling": {
+        "invert": False,
+    },
+    "vtracer": {
+        "colormode": "color",
+        "hierarchical": "stacked",
+        "mode": "spline",
+        "filter_speckle": 4,
+        "color_precision": 6,
+        "layer_difference": 16,
+        "corner_threshold": 60,
+        "length_threshold": 4.0,
+        "max_iterations": 10,
+        "splice_threshold": 45,
+        "path_precision": 6,
+    },
+}
+
+DEFAULT_HIGH_PRECISION_BW = {
+    "name": "High Precision B&W",
+    "description": "Potrace-powered precision tracing for logos, text, and lettering. "
+                   "Produces mathematically optimal curves with sharp, clean edges.",
+    "icon": "\U0001f3af",
+    "category": "Precision",
+    "mode": "bw",
+    "high_precision_bw": True,
+    "alpha_handling": {
+        "invert": "auto",
+    },
+    "potrace": {
+        "turd_size": 5,
+        "alphamax": 1.0,
+        "opttolerance": 0.5,
+    },
     "preprocessing": {
         "denoise": True,
         "denoise_strength": 5,
-        "sharpen": False,
-        "sharpen_amount": 1.0,
-        "contrast_enhance": False,
-        "contrast_clip_limit": 2.0,
-        "contrast_grid_size": 8,
-        "invert": False,
     },
-    "color": {
-        "num_colors": 12,
-        "edge_margin": 1,
-        "min_cluster_fraction": 0.01,
-    },
-    "threshold": {
-        "method": "simple",
-        "value": 128,
-    },
-    "tracing": {
-        "turd_size": 3,
-        "corner_threshold": 1.0,
-        "optimize_tolerance": 0.2,
-        "smooth": True,
-        "min_contour_area": 30,
-        "simplify_tolerance": 1.0,
-    },
-    "output": {
-        "stroke_color": "none",
-        "stroke_width": 0,
-        "fill_color": "#000000",
-        "fill_mode": "fill",
-        "background": "transparent",
-    }
 }
 
 
@@ -128,23 +113,26 @@ def _apply_learned(preset, learned_settings):
     return result
 
 
+_PRESET_MAP = {
+    "laser_bw": DEFAULT_LASER_BW,
+    "full_color": DEFAULT_FULL_COLOR,
+    "high_precision_bw": DEFAULT_HIGH_PRECISION_BW,
+}
+
+
 def get_preset(name):
     """Get a preset by name with learned settings applied."""
+    default = _PRESET_MAP.get(name)
+    if default is None:
+        return None
+
     learned = _load_learned()
+    preset = copy.deepcopy(default)
 
-    if name == "laser_bw":
-        preset = copy.deepcopy(DEFAULT_LASER_BW)
-        if "laser_bw" in learned and learned["laser_bw"].get("sample_count", 0) > 0:
-            preset = _apply_learned(preset, learned["laser_bw"].get("settings", {}))
-        return preset
+    if name in learned and learned[name].get("sample_count", 0) > 0:
+        preset = _apply_learned(preset, learned[name].get("settings", {}))
 
-    elif name == "full_color":
-        preset = copy.deepcopy(DEFAULT_FULL_COLOR)
-        if "full_color" in learned and learned["full_color"].get("sample_count", 0) > 0:
-            preset = _apply_learned(preset, learned["full_color"].get("settings", {}))
-        return preset
-
-    return None
+    return preset
 
 
 def list_presets():
@@ -152,7 +140,7 @@ def list_presets():
     learned = _load_learned()
 
     presets = []
-    for key, default in [("laser_bw", DEFAULT_LASER_BW), ("full_color", DEFAULT_FULL_COLOR)]:
+    for key, default in _PRESET_MAP.items():
         info = {
             "key": key,
             "name": default["name"],
@@ -160,7 +148,6 @@ def list_presets():
             "icon": default["icon"],
             "category": default["category"],
         }
-        # Add learning stats if available
         if key in learned:
             info["sample_count"] = learned[key].get("sample_count", 0)
             info["best_score"] = learned[key].get("best_score", 0)

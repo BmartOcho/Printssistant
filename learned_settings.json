@@ -1,69 +1,55 @@
 {
   "laser_bw": {
-    "last_updated": "2026-03-05T12:00:00",
+    "last_updated": "",
     "best_score": 0,
     "sample_count": 0,
     "settings": {
-      "preprocessing": {
-        "grayscale": true,
-        "denoise": true,
-        "denoise_strength": 10,
-        "sharpen": true,
-        "sharpen_amount": 1.5,
-        "contrast_enhance": true,
-        "contrast_clip_limit": 3.0,
-        "contrast_grid_size": 8,
-        "morphology": "close",
-        "morphology_kernel": 2,
-        "invert": "auto"
-      },
-      "threshold": {
-        "method": "otsu",
-        "value": 128,
-        "adaptive_block_size": 15,
-        "adaptive_c": 5
-      },
-      "tracing": {
-        "turd_size": 2,
-        "corner_threshold": 1.0,
-        "optimize_tolerance": 0.2,
-        "smooth": true,
-        "min_contour_area": 50,
-        "simplify_tolerance": 1.5
+      "vtracer": {
+        "colormode": "binary",
+        "hierarchical": "stacked",
+        "mode": "spline",
+        "filter_speckle": 4,
+        "corner_threshold": 60,
+        "length_threshold": 4.0,
+        "max_iterations": 10,
+        "splice_threshold": 45,
+        "path_precision": 8
       }
     }
   },
   "full_color": {
-    "last_updated": "2026-03-05T12:00:00",
+    "last_updated": "",
     "best_score": 0,
     "sample_count": 0,
     "settings": {
+      "vtracer": {
+        "colormode": "color",
+        "hierarchical": "stacked",
+        "mode": "spline",
+        "filter_speckle": 4,
+        "color_precision": 6,
+        "layer_difference": 16,
+        "corner_threshold": 60,
+        "length_threshold": 4.0,
+        "max_iterations": 10,
+        "splice_threshold": 45,
+        "path_precision": 6
+      }
+    }
+  },
+  "high_precision_bw": {
+    "last_updated": "",
+    "best_score": 0,
+    "sample_count": 0,
+    "settings": {
+      "potrace": {
+        "turd_size": 5,
+        "alphamax": 1.0,
+        "opttolerance": 0.5
+      },
       "preprocessing": {
         "denoise": true,
-        "denoise_strength": 5,
-        "sharpen": false,
-        "sharpen_amount": 1.0,
-        "contrast_enhance": false,
-        "contrast_clip_limit": 2.0,
-        "contrast_grid_size": 8,
-        "invert": false
-      },
-      "color": {
-        "num_colors": 12,
-        "edge_margin": 1,
-        "min_cluster_fraction": 0.01
-      },
-      "threshold": {
-        "method": "simple",
-        "value": 128
-      },
-      "tracing": {
-        "turd_size": 3,
-        "corner_threshold": 1.0,
-        "optimize_tolerance": 0.2,
-        "smooth": true,
-        "min_contour_area": 30,
-        "simplify_tolerance": 1.0
+        "denoise_strength": 5
       }
     }
   }
