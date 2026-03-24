@@ -49,3 +49,22 @@ def increment_job_count(user_id: str) -> int:
     new_count = (user.get("monthly_jobs") or 0) + 1
     supabase.table("users").update({"monthly_jobs": new_count}).eq("id", user_id).execute()
     return new_count
+
+
+def log_job_history(user_id: str, tool_name: str, file_size: int = 0, processing_ms: int = 0) -> None:
+    """
+    Log tool usage to job_history table for analytics.
+    Non-blocking; errors are logged but don't raise exceptions.
+    """
+    try:
+        import datetime
+        supabase.table("job_history").insert({
+            "user_id": user_id,
+            "tool_name": tool_name,
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "file_size": file_size,
+            "processing_ms": processing_ms,
+        }).execute()
+    except Exception as e:
+        # Silently log errors; don't crash the tool if logging fails
+        print(f"⚠️  Failed to log job history: {e}")

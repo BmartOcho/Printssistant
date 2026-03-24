@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from PyPDF2 import PdfReader, PdfWriter
+from pypdf import PdfReader, PdfWriter
 from typing import List, Optional
 
 def insert_pages(base_pdf: Path, insert_pdf: Path, output_pdf: Path, interval: Optional[int], positions: List[int]) -> bool:
