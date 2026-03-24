@@ -54,7 +54,7 @@ const userBar             = document.getElementById('user-bar');
 const userInfoText        = document.getElementById('user-info-text');
 const logoutBtn           = document.getElementById('logout-btn');
 const proCta              = document.getElementById('pro-cta');
-const navSignInLink       = document.getElementById('nav-sign-in');
+const navAuthBtn          = document.getElementById('nav-auth-btn');
 
 // Tools that require login (free tier)
 const AUTH_REQUIRED_TOOLS = ['duplexer', 'insertbetween', 'cropper'];
@@ -118,7 +118,7 @@ async function handleAuthSuccess(data) {
 function handleSignOut() {
     localStorage.removeItem(TOKEN_KEY);
     currentUser = null;
-    userBar.classList.add('hidden');
+    updateUIForAuthState();
     proCta.style.display = '';
 }
 
@@ -144,13 +144,15 @@ function hideAuthModal() {
 
 function updateUIForAuthState() {
     if (!currentUser) {
-        // Not logged in — hide user bar
+        // Not logged in — hide user bar, show "Sign In" button
         userBar.classList.add('hidden');
+        navAuthBtn.textContent = 'Sign In';
         return;
     }
 
-    // Logged in — show user bar
+    // Logged in — show user bar, show "Sign Out" button
     userBar.classList.remove('hidden');
+    navAuthBtn.textContent = 'Sign Out';
 
     if (currentUser.is_pro) {
         userInfoText.textContent = `${currentUser.email} ⚡ Pro`;
@@ -260,10 +262,16 @@ function showAuthError(msg) {
     authError.classList.remove('hidden');
 }
 
-// ── Sign-In Link ──────────────────────────────────────────────────────────────
-navSignInLink.addEventListener('click', (e) => {
+// ── Nav Auth Button (Sign In / Sign Out) ──────────────────────────────────────
+navAuthBtn.addEventListener('click', (e) => {
     e.preventDefault();
-    showAuthModal();
+    if (currentUser) {
+        // User is logged in — sign them out
+        handleSignOut();
+    } else {
+        // User is not logged in — show sign in modal
+        showAuthModal();
+    }
 });
 
 // ── Logout ────────────────────────────────────────────────────────────────────
