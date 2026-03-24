@@ -1,14 +1,17 @@
 import os
+import asyncio
 import shutil
 import zipfile
 import secrets
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
-from fastapi import FastAPI, UploadFile, File, BackgroundTasks, Form, HTTPException, Depends, Request
+from fastapi import FastAPI, UploadFile, File, BackgroundTasks, Form, HTTPException, Depends, Request, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from duplexer import make_duplex
 from cropper_logic import process_auto_crop
 from insert_logic import insert_pages
@@ -17,7 +20,7 @@ from vectorizer import engine as vectorizer_engine
 from presets import get_preset
 from swatchset_logic import generate_swatchset
 from auth import get_current_user, require_pro, check_free_limit, create_access_token
-from db import supabase, increment_job_count
+from db import supabase, increment_job_count, log_job_history
 from passlib.context import CryptContext
 
 resend_client = None
@@ -35,15 +38,77 @@ print(f"[STARTUP] Checking variable name: RESEND_API_KEY")
 
 app = FastAPI(title="Printssistant API")
 
+# ── CORS Configuration ────────────────────────────────────────────────────────
+# Allow production domain + localhost for development/testing
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+ALLOWED_ORIGINS = [
+    "https://printssistant.com",
+    "https://www.printssistant.com",
+]
+# Allow localhost in dev/staging environments
+if ENVIRONMENT in ["development", "staging"]:
+    ALLOWED_ORIGINS.extend([
+        "http://localhost",
+        "http://localhost:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:8000",
+    ])
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+
+# ── Cache Control Middleware ──────────────────────────────────────────────────
+@app.middleware("http")
+async def add_cache_control(request: Request, call_next):
+    """Add Cache-Control headers to static assets for optimal edge caching."""
+    response = await call_next(request)
+    path = request.url.path
+
+    # Cache CSS, JS, images, fonts for 1 year (they're immutable once deployed)
+    if path.startswith("/static/") and any(path.endswith(ext) for ext in [".css", ".js", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".woff", ".woff2", ".ttf"]):
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    # Cache HTML for 1 hour with revalidation
+    elif path.endswith(".html") or path == "/":
+        response.headers["Cache-Control"] = "public, max-age=3600, must-revalidate"
+
+    return response
+
+
+# Rate limiter for brute-force protection
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+
+# Import and add slowapi error handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+
+app.add_middleware(SlowAPIMiddleware)
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+    """Handle rate limit exceeded errors."""
+    return JSONResponse(
+        status_code=429,
+        content={"status": "error", "message": "Too many authentication attempts. Please try again later."}
+    )
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+# ── Health Check ──────────────────────────────────────────────────────────────
+
+@app.get("/health")
+async def health():
+    """Health check endpoint for Railway and load balancer monitoring."""
+    return {"status": "ok"}
 
 
 # ── Password Reset Setup ─────────────────────────────────────────────────────
@@ -88,6 +153,22 @@ PROCESSED_DIR.mkdir(exist_ok=True)
 
 # Mount static files
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+
+# File size limits (in bytes)
+MAX_PDF_SIZE = 50 * 1024 * 1024  # 50 MB for PDFs
+MAX_IMAGE_SIZE = 20 * 1024 * 1024  # 20 MB for images
+
+
+# ── Cleanup Helper ──────────────────────────────────────────────────────────
+
+def cleanup_files(*file_paths: Path):
+    """Delete temporary files after response is sent."""
+    for file_path in file_paths:
+        try:
+            if file_path.exists():
+                file_path.unlink()
+        except Exception as e:
+            print(f"⚠️  Failed to delete {file_path}: {e}")
 
 
 # ── Root ────────────────────────────────────────────────────────────────────
@@ -185,6 +266,7 @@ async def submit_suggestion(request: Request):
 # ── Auth ─────────────────────────────────────────────────────────────────────
 
 @app.post("/auth/signup")
+@limiter.limit("10/minute")
 async def signup(request: Request):
     """Create a new account with email + password."""
     body = await request.json()
@@ -218,6 +300,7 @@ async def signup(request: Request):
 
 
 @app.post("/auth/signin")
+@limiter.limit("10/minute")
 async def signin(request: Request):
     """Sign in with email + password, returns a JWT."""
     body = await request.json()
@@ -451,41 +534,69 @@ async def upload_pdf(
     file: UploadFile = File(...),
     user: dict = Depends(check_free_limit),
 ):
+    import time
+    file_content = await file.read()
+    file_size = len(file_content)
+    if file_size > MAX_PDF_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large. Maximum size is {MAX_PDF_SIZE // (1024*1024)} MB."
+        )
+
     safe_name = Path(file.filename).name
     file_path = UPLOAD_DIR / safe_name
     with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        buffer.write(file_content)
 
     output_filename = f"duplex_{safe_name}"
     output_path = PROCESSED_DIR / output_filename
 
-    success = make_duplex(file_path, output_path)
+    # Run CPU-intensive duplexer in thread pool to avoid blocking event loop
+    start_time = time.time()
+    success = await asyncio.to_thread(make_duplex, file_path, output_path)
+    processing_ms = int((time.time() - start_time) * 1000)
 
     if success:
         increment_job_count(user["id"])
+        # Log job history in background (non-blocking)
+        background_tasks.add_task(log_job_history, user["id"], "duplexer", file_size, processing_ms)
+        # Clean up original upload after response
+        background_tasks.add_task(cleanup_files, file_path)
         return {"status": "success", "filename": output_filename}
     else:
+        # Clean up on error too
+        background_tasks.add_task(cleanup_files, file_path)
         return {"status": "error", "message": "Failed to process PDF"}
 
 
 @app.post("/crop")
 async def crop_pdf(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    rows: int = Form(...),
-    cols: int = Form(...),
+    rows: int = Form(..., ge=1, le=100),
+    cols: int = Form(..., ge=1, le=100),
     user: dict = Depends(check_free_limit),
 ):
+    import time
+    file_content = await file.read()
+    file_size = len(file_content)
+    if file_size > MAX_PDF_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large. Maximum size is {MAX_PDF_SIZE // (1024*1024)} MB."
+        )
+
     safe_name = Path(file.filename).name
     file_path = UPLOAD_DIR / safe_name
     with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        buffer.write(file_content)
 
-    if rows < 1 or cols < 1:
-        return JSONResponse(status_code=400, content={"status": "error", "message": "rows and cols must be at least 1"})
-
-    cropped_files = process_auto_crop(file_path, PROCESSED_DIR, rows, cols)
+    start_time = time.time()
+    cropped_files = await asyncio.to_thread(process_auto_crop, file_path, PROCESSED_DIR, rows, cols)
+    processing_ms = int((time.time() - start_time) * 1000)
 
     if not cropped_files:
+        background_tasks.add_task(cleanup_files, file_path)
         return JSONResponse(status_code=500, content={"status": "error", "message": "Crop produced no output"})
 
     if len(cropped_files) > 1:
@@ -495,36 +606,72 @@ async def crop_pdf(
             for f in cropped_files:
                 zipf.write(PROCESSED_DIR / f, arcname=f)
         increment_job_count(user["id"])
+        # Log job history in background
+        background_tasks.add_task(log_job_history, user["id"], "cropper", file_size, processing_ms)
+        # Clean up original and cropped files after response
+        cleanup_paths = [file_path, zip_path] + [PROCESSED_DIR / f for f in cropped_files]
+        background_tasks.add_task(cleanup_files, *cleanup_paths)
         return {"status": "success", "filename": zip_filename}
 
     increment_job_count(user["id"])
+    # Log job history in background
+    background_tasks.add_task(log_job_history, user["id"], "cropper", file_size, processing_ms)
+    # Clean up original and cropped file after response
+    background_tasks.add_task(cleanup_files, file_path, PROCESSED_DIR / cropped_files[0])
     return {"status": "success", "filename": cropped_files[0]}
 
 
 @app.post("/insert")
 async def insert_pdf(
+    background_tasks: BackgroundTasks,
     base_file: UploadFile = File(...),
     insert_file: UploadFile = File(...),
-    interval: int = Form(...),
+    interval: int = Form(..., ge=1),
     user: dict = Depends(check_free_limit),
 ):
+    import time
+    # Read and validate base file size
+    base_content = await base_file.read()
+    if len(base_content) > MAX_PDF_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Base file too large. Maximum size is {MAX_PDF_SIZE // (1024*1024)} MB."
+        )
+
+    # Read and validate insert file size
+    insert_content = await insert_file.read()
+    if len(insert_content) > MAX_PDF_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Insert file too large. Maximum size is {MAX_PDF_SIZE // (1024*1024)} MB."
+        )
+
     base_path = UPLOAD_DIR / Path(base_file.filename).name
     with open(base_path, "wb") as buffer:
-        shutil.copyfileobj(base_file.file, buffer)
+        buffer.write(base_content)
 
     insert_path = UPLOAD_DIR / Path(insert_file.filename).name
     with open(insert_path, "wb") as buffer:
-        shutil.copyfileobj(insert_file.file, buffer)
+        buffer.write(insert_content)
 
     output_filename = f"inserted_{Path(base_file.filename).name}"
     output_path = PROCESSED_DIR / output_filename
 
-    success = insert_pages(base_path, insert_path, output_path, interval=interval, positions=[])
+    total_file_size = len(base_content) + len(insert_content)
+    start_time = time.time()
+    success = await asyncio.to_thread(insert_pages, base_path, insert_path, output_path, interval=interval, positions=[])
+    processing_ms = int((time.time() - start_time) * 1000)
 
     if success:
         increment_job_count(user["id"])
+        # Log job history in background
+        background_tasks.add_task(log_job_history, user["id"], "insert", total_file_size, processing_ms)
+        # Clean up original upload files after response
+        background_tasks.add_task(cleanup_files, base_path, insert_path)
         return {"status": "success", "filename": output_filename}
     else:
+        # Clean up on error too
+        background_tasks.add_task(cleanup_files, base_path, insert_path)
         return {"status": "error", "message": "Failed to process PDF"}
 
 
@@ -532,11 +679,14 @@ async def insert_pdf(
 
 @app.post("/evenodd")
 async def get_even_odd(
-    start: int = Form(...),
-    end: int = Form(...),
+    start: int = Form(..., ge=0, le=1000000),
+    end: int = Form(..., ge=0, le=1000000),
     type: str = Form(...),
 ):
     """Even/Odd generator — open to all, no auth required."""
+    if start > end:
+        raise HTTPException(status_code=400, detail="start must be less than or equal to end")
+
     is_even = True if type == "even" else False
     result_string = generate_even_odd(start, end, is_even)
     return {"status": "success", "result": result_string}
@@ -546,19 +696,29 @@ async def get_even_odd(
 
 @app.post("/vectorize")
 async def vectorize_image(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     preset: str = Form("laser_bw"),
     user: dict = Depends(require_pro),
 ):
+    import time
     preset_config = get_preset(preset)
     if not preset_config:
         return {"status": "error", "message": f"Unknown preset: {preset}"}
 
     image_bytes = await file.read()
+    file_size = len(image_bytes)
+    if file_size > MAX_IMAGE_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Image file too large. Maximum size is {MAX_IMAGE_SIZE // (1024*1024)} MB."
+        )
 
     try:
-        result = vectorizer_engine.vectorize(image_bytes, preset_config)
-        import time
+        start_time = time.time()
+        result = await asyncio.to_thread(vectorizer_engine.vectorize, image_bytes, preset_config)
+        processing_ms = int((time.time() - start_time) * 1000)
+
         timestamp = int(time.time())
         basename = os.path.splitext(Path(file.filename).name)[0]
         svg_filename = f"{basename}_{preset}_{timestamp}.svg"
@@ -566,6 +726,11 @@ async def vectorize_image(
 
         with open(svg_path, "w", encoding="utf-8") as f:
             f.write(result["svg"])
+
+        # Log job history in background
+        background_tasks.add_task(log_job_history, user["id"], "vectorizer", file_size, processing_ms)
+        # Cleanup SVG file after response is sent
+        background_tasks.add_task(cleanup_files, svg_path)
 
         return {
             "status": "success",
@@ -579,6 +744,7 @@ async def vectorize_image(
 
 @app.post("/swatchset")
 async def create_swatchset(
+    background_tasks: BackgroundTasks,
     base_c: int = Form(...),
     base_m: int = Form(...),
     base_y: int = Form(...),
@@ -595,14 +761,23 @@ async def create_swatchset(
 ):
     import time
     ref_bytes = None
+    ref_size = 0
     if reference_image and reference_image.filename:
         ref_bytes = await reference_image.read()
+        ref_size = len(ref_bytes)
+        if ref_size > MAX_IMAGE_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Reference image too large. Maximum size is {MAX_IMAGE_SIZE // (1024*1024)} MB."
+            )
 
     timestamp = time.strftime("%Y%m%d_%H%M%S")
     ext = "eps" if output_format == "eps" else "pdf"
     output_path = PROCESSED_DIR / f"swatchset_{timestamp}.{ext}"
 
-    success = generate_swatchset(
+    start_time = time.time()
+    success = await asyncio.to_thread(
+        generate_swatchset,
         output_path=output_path,
         base_c=base_c, base_m=base_m, base_y=base_y, base_k=base_k,
         goal_type=goal_type,
@@ -612,11 +787,25 @@ async def create_swatchset(
         reference_image_bytes=ref_bytes,
         output_format=output_format,
     )
+    processing_ms = int((time.time() - start_time) * 1000)
+
+    # Cleanup output file after response is sent
+    background_tasks.add_task(cleanup_files, output_path)
 
     if success:
+        # Log job history in background
+        background_tasks.add_task(log_job_history, user["id"], "swatchset", ref_size, processing_ms)
         return {"status": "success", "filename": output_path.name}
     fmt_label = "EPS" if output_format == "eps" else "PDF"
     return {"status": "error", "message": f"Failed to generate swatch set {fmt_label}"}
+
+
+# ── Health & Monitoring ────────────────────────────────────────────────────────
+
+@app.get("/health")
+async def health():
+    """Health check endpoint for Railway and load balancers."""
+    return {"status": "ok"}
 
 
 # ── Downloads ─────────────────────────────────────────────────────────────────
