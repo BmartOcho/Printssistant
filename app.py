@@ -38,9 +38,27 @@ print(f"[STARTUP] Checking variable name: RESEND_API_KEY")
 
 app = FastAPI(title="Printssistant API")
 
+# ── CORS Configuration ────────────────────────────────────────────────────────
+# Allow production domain + localhost for development/testing
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+ALLOWED_ORIGINS = [
+    "https://printssistant.com",
+    "https://www.printssistant.com",
+]
+# Allow localhost in dev/staging environments
+if ENVIRONMENT in ["development", "staging"]:
+    ALLOWED_ORIGINS.extend([
+        "http://localhost",
+        "http://localhost:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:8000",
+    ])
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://printssistant.com"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
