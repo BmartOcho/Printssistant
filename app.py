@@ -789,8 +789,6 @@ async def create_swatchset(
     )
     processing_ms = int((time.time() - start_time) * 1000)
 
-    # Cleanup output file after response is sent
-    background_tasks.add_task(cleanup_files, output_path)
 
     if success:
         # Log job history in background
