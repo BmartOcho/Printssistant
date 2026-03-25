@@ -5,6 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Printssistant | Professional Printing Utilities</title>
     <link rel="stylesheet" href="static/style.css" />
+    <style>
+      .user-type-btn {
+        flex: 1;
+        padding: 0.5rem 0.4rem;
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 6px;
+        color: rgba(248,250,252,0.7);
+        font-size: 0.8rem;
+        font-family: "Outfit", sans-serif;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .user-type-btn:hover { border-color: rgba(255,255,255,0.35); color: white; }
+      .user-type-btn.selected { border-color: #c13584; background: rgba(193,53,132,0.2); color: white; }
+      #nav-profile-link.hidden { display: none !important; }
+    </style>
     <script src="https://js.stripe.com/v3/"></script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -26,10 +43,14 @@
       <div class="nav-container">
         <div class="nav-links">
           <a href="/" class="nav-link">Home</a>
+          <a href="/preflight" class="nav-link">DG Preflight</a>
           <a href="/blog" class="nav-link">Blog</a>
           <a href="/suggest-idea" class="nav-link">Suggest an Idea</a>
         </div>
-        <button id="nav-auth-btn" class="nav-link nav-sign-in">Sign In</button>
+        <div style="display:flex; align-items:center; gap:0.75rem;">
+          <a id="nav-profile-link" href="/profile" class="nav-link hidden">My Profile</a>
+          <button id="nav-auth-btn" class="nav-link nav-sign-in">Sign In</button>
+        </div>
       </div>
     </nav>
 
@@ -39,6 +60,14 @@
         <h2 id="auth-modal-title">Sign In</h2>
         <p id="auth-modal-subtitle">Access your Printssistant tools</p>
         <div class="auth-form">
+          <!-- User type — shown only in signup mode -->
+          <div id="user-type-row" style="display:none; margin-bottom:0.75rem;">
+            <p style="font-size:0.8rem; color:rgba(248,250,252,0.55); margin-bottom:0.5rem;">I am a…</p>
+            <div style="display:flex; gap:0.5rem;">
+              <button type="button" id="type-og-btn" class="user-type-btn" data-type="og">🖨️ Print Operator</button>
+              <button type="button" id="type-dg-btn" class="user-type-btn" data-type="dg">🎨 Designer</button>
+            </div>
+          </div>
           <input type="email" id="auth-email" class="glass-input auth-input" placeholder="Email address" autocomplete="email" />
           <input type="password" id="auth-password" class="glass-input auth-input" placeholder="Password" autocomplete="current-password" />
           <button id="auth-submit-btn" class="btn-primary auth-submit">Sign In</button>

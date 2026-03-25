@@ -20,7 +20,13 @@ from vectorizer import engine as vectorizer_engine
 from presets import get_preset
 from swatchset_logic import generate_swatchset
 from auth import get_current_user, require_pro, check_free_limit, create_access_token
-from db import supabase, increment_job_count, log_job_history
+from db import (
+    supabase, increment_job_count, log_job_history,
+    update_user_profile, get_public_profile,
+    create_preflight_job, complete_preflight_job, fail_preflight_job, get_preflight_job,
+    get_preflight_count_today, get_preflight_count_month, increment_preflight_ip,
+)
+from preflight_logic import run_preflight
 from passlib.context import CryptContext
 
 resend_client = None
@@ -287,16 +293,31 @@ async def signup(request: Request):
     user_id = str(uuid.uuid4())
     password_hash = pwd_context.hash(password)
 
+    user_type = body.get("user_type", "").strip().lower()
+    if user_type not in ("og", "dg"):
+        user_type = None  # will be set during onboarding
+
+    import datetime
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
     supabase.table("users").insert({
         "id": user_id,
         "email": email,
         "password_hash": password_hash,
         "is_pro": False,
         "monthly_jobs": 0,
+        "user_type": user_type,
+        "created_at": now,
+        "updated_at": now,
     }).execute()
 
     token = create_access_token(user_id, email)
-    return {"access_token": token, "email": email, "is_pro": False, "monthly_jobs": 0}
+    return {
+        "access_token": token,
+        "email": email,
+        "is_pro": False,
+        "monthly_jobs": 0,
+        "user_type": user_type,
+    }
 
 
 @app.post("/auth/signin")
@@ -477,13 +498,208 @@ async def reset_password(request: Request):
 
 @app.get("/auth/me")
 async def get_me(user: dict = Depends(get_current_user)):
-    """Returns current user info. Frontend uses this to check auth state."""
+    """Returns current user info including profile fields."""
     return {
         "id": user.get("id"),
         "email": user.get("email"),
         "is_pro": user.get("is_pro", False),
         "monthly_jobs": user.get("monthly_jobs", 0),
+        "user_type": user.get("user_type"),
+        "company_name": user.get("company_name"),
+        "bio": user.get("bio"),
+        "profile_image_url": user.get("profile_image_url"),
+        "location": user.get("location"),
+        "social_links": user.get("social_links") or {},
+        "is_verified": user.get("is_verified", False),
     }
+
+
+# ── Profile ───────────────────────────────────────────────────────────────────
+
+@app.get("/profile")
+async def profile_page():
+    return FileResponse(BASE_DIR / "static" / "profile.html")
+
+
+@app.get("/profile/{user_id}")
+async def public_profile_page(user_id: str):
+    return FileResponse(BASE_DIR / "static" / "profile.html")
+
+
+@app.get("/api/profile/{user_id}")
+async def get_profile(user_id: str):
+    """Public profile — safe fields only."""
+    profile = get_public_profile(user_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="User not found")
+    return profile
+
+
+@app.put("/api/profile")
+async def update_profile(request: Request, user: dict = Depends(get_current_user)):
+    """Update the logged-in user's profile fields."""
+    body = await request.json()
+
+    # Validate user_type if provided
+    user_type = body.get("user_type")
+    if user_type is not None and user_type not in ("og", "dg"):
+        raise HTTPException(status_code=400, detail="user_type must be 'og' or 'dg'")
+
+    # Enforce bio length
+    bio = body.get("bio")
+    if bio and len(bio) > 250:
+        raise HTTPException(status_code=400, detail="Bio must be 250 characters or fewer")
+
+    # Validate social_links shape if provided
+    social_links = body.get("social_links")
+    if social_links is not None:
+        allowed_keys = {"linkedin", "twitter", "website"}
+        if not isinstance(social_links, dict) or not set(social_links.keys()).issubset(allowed_keys):
+            raise HTTPException(status_code=400, detail="social_links must contain only: linkedin, twitter, website")
+
+    fields = {}
+    for key in ("user_type", "company_name", "bio", "profile_image_url", "location", "social_links"):
+        if key in body:
+            fields[key] = body[key]
+
+    if not fields:
+        raise HTTPException(status_code=400, detail="No valid fields to update")
+
+    update_user_profile(user["id"], fields)
+    return {"status": "ok"}
+
+
+# ── DG Preflight ──────────────────────────────────────────────────────────────
+
+PREFLIGHT_FREE_LIMIT_MONTH = 5
+PREFLIGHT_ANON_LIMIT_DAY = 1
+PREFLIGHT_MAX_SIZE_FREE = 10 * 1024 * 1024   # 10 MB
+PREFLIGHT_MAX_SIZE_PRO  = 50 * 1024 * 1024   # 50 MB
+
+
+@app.get("/preflight")
+async def preflight_page():
+    return FileResponse(BASE_DIR / "static" / "preflight.html")
+
+
+@app.get("/preflight/{job_id}")
+async def preflight_result_page(job_id: str):
+    """Serve the same preflight page; JS reads job_id from the URL."""
+    return FileResponse(BASE_DIR / "static" / "preflight.html")
+
+
+@app.post("/api/preflight")
+async def run_preflight_check(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    credentials = Depends(security),
+):
+    """
+    Upload a PDF and run all 5 preflight checks.
+    Returns {job_id, results, overall, page_count} immediately.
+    PDF bytes are discarded right after processing.
+
+    Rate limits:
+      - Anonymous (no token):  1 check / IP / day
+      - Free user:             5 checks / month
+      - Pro user:              unlimited
+    """
+    ip = request.client.host if request.client else "unknown"
+
+    # Resolve auth (optional — anonymous is allowed)
+    user = None
+    is_pro = False
+    if credentials:
+        try:
+            from auth import SECRET_KEY, ALGORITHM
+            from jose import jwt as jose_jwt
+            payload = jose_jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+            user_id = payload.get("sub")
+            if user_id:
+                from db import get_user_record
+                user = get_user_record(user_id)
+                is_pro = (user or {}).get("is_pro", False)
+        except Exception:
+            pass  # treat as anonymous if token is bad
+
+    max_size = PREFLIGHT_MAX_SIZE_PRO if is_pro else PREFLIGHT_MAX_SIZE_FREE
+
+    # ── File size gate ────────────────────────────────────────────────────────
+    pdf_bytes = await file.read()
+    file_size = len(pdf_bytes)
+
+    if file_size > max_size:
+        limit_mb = max_size // (1024 * 1024)
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large. Limit is {limit_mb} MB {'for Pro' if is_pro else '— upgrade to Pro for 50 MB'}.",
+        )
+
+    if file.content_type and "pdf" not in file.content_type.lower():
+        raise HTTPException(status_code=400, detail="Only PDF files are accepted.")
+
+    # ── Quota check ───────────────────────────────────────────────────────────
+    if not is_pro:
+        if user:
+            month_count = get_preflight_count_month(user["id"])
+            if month_count >= PREFLIGHT_FREE_LIMIT_MONTH:
+                raise HTTPException(
+                    status_code=429,
+                    detail=f"Free tier allows {PREFLIGHT_FREE_LIMIT_MONTH} preflight checks per month. Upgrade to Pro for unlimited.",
+                )
+        else:
+            day_count = get_preflight_count_today(ip)
+            if day_count >= PREFLIGHT_ANON_LIMIT_DAY:
+                raise HTTPException(
+                    status_code=429,
+                    detail="Anonymous users get 1 free preflight check per day. Sign up for more.",
+                )
+
+    # ── Create job record ─────────────────────────────────────────────────────
+    user_id = (user or {}).get("id")
+    job_id = create_preflight_job(
+        user_id=user_id,
+        ip_address=ip,
+        filename=file.filename or "upload.pdf",
+        file_size=file_size,
+    )
+
+    # ── Run checks (synchronous but fast enough for request cycle) ─────────
+    try:
+        preflight_result = await asyncio.to_thread(run_preflight, pdf_bytes, file_size)
+    except Exception as exc:
+        fail_preflight_job(job_id, str(exc))
+        raise HTTPException(status_code=500, detail="Preflight processing failed.")
+    finally:
+        del pdf_bytes  # discard immediately — GDPR compliance
+
+    if "error" in preflight_result:
+        fail_preflight_job(job_id, preflight_result["error"])
+        raise HTTPException(status_code=422, detail=preflight_result["error"])
+
+    # Store page_count in results for display
+    complete_preflight_job(job_id, preflight_result)
+
+    # Increment quota counters
+    if not is_pro:
+        if not user:
+            background_tasks.add_task(increment_preflight_ip, ip)
+
+    return {
+        "job_id": job_id,
+        "filename": file.filename,
+        **preflight_result,
+    }
+
+
+@app.get("/api/preflight/{job_id}")
+async def get_preflight_result(job_id: str):
+    """Fetch a completed preflight result by job ID (shareable link)."""
+    job = get_preflight_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Preflight result not found or expired.")
+    return job
 
 
 # ── Stripe Webhook ────────────────────────────────────────────────────────────

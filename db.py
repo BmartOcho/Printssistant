@@ -51,6 +51,139 @@ def increment_job_count(user_id: str) -> int:
     return new_count
 
 
+# ── User Profiles ─────────────────────────────────────────────────────────────
+
+def update_user_profile(user_id: str, fields: dict) -> None:
+    """Update profile fields on the users table. Only writes provided keys."""
+    import datetime
+    fields["updated_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    # Whitelist editable fields
+    allowed = {"user_type", "company_name", "bio", "profile_image_url", "location", "social_links", "updated_at"}
+    safe = {k: v for k, v in fields.items() if k in allowed}
+    if safe:
+        supabase.table("users").update(safe).eq("id", user_id).execute()
+
+
+def get_public_profile(user_id: str) -> dict | None:
+    """Fetch public-safe profile fields for a user."""
+    result = (
+        supabase.table("users")
+        .select("id, email, user_type, company_name, bio, profile_image_url, location, social_links, is_verified, created_at")
+        .eq("id", user_id)
+        .single()
+        .execute()
+    )
+    return result.data if result.data else None
+
+
+# ── Preflight Jobs ─────────────────────────────────────────────────────────────
+
+def create_preflight_job(user_id: str | None, ip_address: str, filename: str, file_size: int) -> str:
+    """Insert a new preflight job with status='processing'. Returns the job id."""
+    import datetime
+    import uuid
+    now = datetime.datetime.now(datetime.timezone.utc)
+    job_id = str(uuid.uuid4())
+    supabase.table("preflight_jobs").insert({
+        "id": job_id,
+        "user_id": user_id,
+        "ip_address": ip_address,
+        "filename": filename,
+        "file_size": file_size,
+        "status": "processing",
+        "created_at": now.isoformat(),
+        "expires_at": (now + datetime.timedelta(days=30)).isoformat(),
+    }).execute()
+    return job_id
+
+
+def complete_preflight_job(job_id: str, results: dict) -> None:
+    """Write check results and mark the job as completed."""
+    import json
+    supabase.table("preflight_jobs").update({
+        "results": results,
+        "status": "completed",
+    }).eq("id", job_id).execute()
+
+
+def fail_preflight_job(job_id: str, error: str) -> None:
+    supabase.table("preflight_jobs").update({
+        "status": "failed",
+        "results": {"error": error},
+    }).eq("id", job_id).execute()
+
+
+def get_preflight_job(job_id: str) -> dict | None:
+    result = (
+        supabase.table("preflight_jobs")
+        .select("id, user_id, filename, file_size, results, status, created_at, page_count")
+        .eq("id", job_id)
+        .single()
+        .execute()
+    )
+    return result.data if result.data else None
+
+
+# ── Preflight Quota ────────────────────────────────────────────────────────────
+
+def get_preflight_count_today(ip_address: str) -> int:
+    """Returns how many preflight checks this IP has run today (UTC)."""
+    import datetime
+    today = datetime.date.today().isoformat()
+    result = (
+        supabase.table("preflight_checks")
+        .select("check_count")
+        .eq("ip_address", ip_address)
+        .eq("check_date", today)
+        .execute()
+    )
+    if result.data:
+        return result.data[0]["check_count"]
+    return 0
+
+
+def get_preflight_count_month(user_id: str) -> int:
+    """Returns how many preflight checks this user has run this calendar month."""
+    import datetime
+    # All rows for this user this month
+    now = datetime.datetime.now(datetime.timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+    result = (
+        supabase.table("preflight_jobs")
+        .select("id", count="exact")
+        .eq("user_id", user_id)
+        .gte("created_at", month_start)
+        .neq("status", "failed")
+        .execute()
+    )
+    return result.count or 0
+
+
+def increment_preflight_ip(ip_address: str) -> None:
+    """Upsert daily IP-based preflight counter."""
+    import datetime
+    today = datetime.date.today().isoformat()
+    existing = (
+        supabase.table("preflight_checks")
+        .select("id, check_count")
+        .eq("ip_address", ip_address)
+        .eq("check_date", today)
+        .execute()
+    )
+    if existing.data:
+        row_id = existing.data[0]["id"]
+        new_count = existing.data[0]["check_count"] + 1
+        supabase.table("preflight_checks").update({"check_count": new_count}).eq("id", row_id).execute()
+    else:
+        import uuid
+        supabase.table("preflight_checks").insert({
+            "id": str(uuid.uuid4()),
+            "ip_address": ip_address,
+            "check_date": today,
+            "check_count": 1,
+        }).execute()
+
+
 def log_job_history(user_id: str, tool_name: str, file_size: int = 0, processing_ms: int = 0) -> None:
     """
     Log tool usage to job_history table for analytics.

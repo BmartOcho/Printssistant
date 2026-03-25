@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Profile | Printssistant</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet" />
+    <style>
+      .profile-wrap {
+        max-width: 640px;
+        margin: 0 auto;
+        padding: 6rem 1.5rem 4rem;
+      }
+
+      .profile-header {
+        text-align: center;
+        margin-bottom: 2.5rem;
+      }
+      .profile-header h1 { font-size: 2rem; font-weight: 800; }
+      .profile-header h1 span { color: var(--primary-light); }
+      .profile-header p { color: rgba(248,250,252,0.6); margin-top: 0.5rem; font-size: 0.9rem; }
+
+      /* ── User type badge ─────────────────────────────────────────────────── */
+      .type-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.3rem 0.85rem;
+        border-radius: 99px;
+        font-weight: 700;
+        font-size: 0.8rem;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.5rem;
+      }
+      .type-og { background: rgba(131,58,180,0.2); color: #c084fc; border: 1px solid rgba(131,58,180,0.4); }
+      .type-dg { background: rgba(193,53,132,0.2); color: #f9a8d4; border: 1px solid rgba(193,53,132,0.4); }
+
+      /* ── Card ────────────────────────────────────────────────────────────── */
+      .profile-card {
+        background: var(--glass-bg);
+        border: 1px solid var(--glass-border);
+        border-radius: 12px;
+        padding: 2rem;
+      }
+
+      .section-title {
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: rgba(248,250,252,0.4);
+        margin-bottom: 1.25rem;
+        margin-top: 1.75rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--glass-border);
+      }
+      .section-title:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+
+      /* ── Form fields ─────────────────────────────────────────────────────── */
+      .field-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+        margin-bottom: 1rem;
+      }
+      .field-group label {
+        font-size: 0.82rem;
+        color: rgba(248,250,252,0.6);
+        font-weight: 500;
+      }
+      .field-group input,
+      .field-group textarea,
+      .field-group select {
+        background: rgba(0,0,0,0.3);
+        border: 1px solid var(--glass-border);
+        border-radius: 6px;
+        padding: 0.6rem 0.85rem;
+        color: var(--text-white);
+        font-size: 0.9rem;
+        font-family: "Outfit", sans-serif;
+        transition: border-color 0.2s;
+        width: 100%;
+      }
+      .field-group input:focus,
+      .field-group textarea:focus,
+      .field-group select:focus {
+        outline: none;
+        border-color: var(--primary-light);
+      }
+      .field-group textarea { resize: vertical; min-height: 80px; }
+      .char-count { font-size: 0.75rem; color: rgba(248,250,252,0.35); text-align: right; }
+
+      /* ── User type selector ──────────────────────────────────────────────── */
+      .type-selector {
+        display: flex;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+      }
+      .type-option {
+        flex: 1;
+        padding: 0.85rem;
+        border: 1px solid var(--glass-border);
+        border-radius: 8px;
+        cursor: pointer;
+        text-align: center;
+        transition: all 0.2s;
+        background: rgba(0,0,0,0.2);
+      }
+      .type-option:hover { border-color: rgba(255,255,255,0.25); }
+      .type-option.selected-og { border-color: #c084fc; background: rgba(131,58,180,0.15); }
+      .type-option.selected-dg { border-color: #f9a8d4; background: rgba(193,53,132,0.15); }
+      .type-option-icon { font-size: 1.5rem; margin-bottom: 0.35rem; }
+      .type-option-label { font-size: 0.85rem; font-weight: 600; }
+      .type-option-desc { font-size: 0.75rem; color: rgba(248,250,252,0.5); margin-top: 0.2rem; }
+
+      /* ── Social links ────────────────────────────────────────────────────── */
+      .social-field {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        margin-bottom: 0.75rem;
+      }
+      .social-icon { font-size: 1rem; width: 1.4rem; text-align: center; flex-shrink: 0; }
+      .social-field input {
+        flex: 1;
+        background: rgba(0,0,0,0.3);
+        border: 1px solid var(--glass-border);
+        border-radius: 6px;
+        padding: 0.55rem 0.75rem;
+        color: var(--text-white);
+        font-size: 0.88rem;
+        font-family: "Outfit", sans-serif;
+      }
+      .social-field input:focus { outline: none; border-color: var(--primary-light); }
+
+      /* ── Action buttons ──────────────────────────────────────────────────── */
+      .btn-primary {
+        width: 100%;
+        padding: 0.75rem;
+        background: linear-gradient(135deg, var(--primary), var(--primary-light));
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+        margin-top: 1.5rem;
+        transition: opacity 0.2s;
+        font-family: "Outfit", sans-serif;
+      }
+      .btn-primary:hover { opacity: 0.88; }
+      .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+      /* ── Status messages ─────────────────────────────────────────────────── */
+      .save-msg {
+        margin-top: 1rem;
+        padding: 0.65rem 1rem;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        text-align: center;
+      }
+      .save-msg.success { background: rgba(34,197,94,0.1); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); }
+      .save-msg.error   { background: rgba(239,68,68,0.1); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+      .hidden { display: none !important; }
+
+      /* ── View-only mode (public profile) ─────────────────────────────────── */
+      .view-only input,
+      .view-only textarea,
+      .view-only select,
+      .view-only .type-option { pointer-events: none; opacity: 0.75; }
+      .view-only .btn-primary { display: none; }
+      .view-only .type-selector { cursor: default; }
+    </style>
+  </head>
+  <body>
+    <div class="background-blobs">
+      <div class="blob blob-1"></div>
+      <div class="blob blob-2"></div>
+      <div class="blob blob-3"></div>
+    </div>
+
+    <nav class="navbar">
+      <div class="nav-container">
+        <div class="nav-links">
+          <a href="/" class="nav-link">Home</a>
+          <a href="/preflight" class="nav-link">DG Preflight</a>
+          <a href="/blog" class="nav-link">Blog</a>
+          <a href="/suggest-idea" class="nav-link">Suggest an Idea</a>
+        </div>
+        <div style="display:flex; align-items:center; gap:0.75rem;">
+          <a id="nav-profile-link" href="/profile" class="nav-link hidden">My Profile</a>
+          <button id="nav-auth-btn" class="nav-link nav-sign-in">Sign In</button>
+        </div>
+      </div>
+    </nav>
+
+    <div class="profile-wrap">
+      <div class="profile-header">
+        <h1 id="page-title">My Profile<span>.</span></h1>
+        <p id="page-subtitle">Manage your account details and preferences.</p>
+      </div>
+
+      <div id="not-found-msg" class="hidden" style="text-align:center; color:rgba(248,250,252,0.5);">
+        Profile not found.
+      </div>
+
+      <div id="profile-card" class="profile-card hidden">
+
+        <!-- User type section -->
+        <div class="section-title">I am a…</div>
+        <div class="type-selector" id="type-selector">
+          <div class="type-option" id="type-og" data-type="og">
+            <div class="type-option-icon">🖨️</div>
+            <div class="type-option-label">Print Operator</div>
+            <div class="type-option-desc">I run print equipment &amp; prep jobs</div>
+          </div>
+          <div class="type-option" id="type-dg" data-type="dg">
+            <div class="type-option-icon">🎨</div>
+            <div class="type-option-label">Designer / Prepress</div>
+            <div class="type-option-desc">I create &amp; prepare print-ready files</div>
+          </div>
+        </div>
+
+        <!-- Basic info -->
+        <div class="section-title">Basic Info</div>
+
+        <div class="field-group">
+          <label for="field-email">Email</label>
+          <input type="email" id="field-email" placeholder="—" readonly style="opacity:0.5;" />
+        </div>
+
+        <div class="field-group">
+          <label for="field-company">Company / Studio</label>
+          <input type="text" id="field-company" placeholder="Where do you work?" maxlength="120" />
+        </div>
+
+        <div class="field-group">
+          <label for="field-location">Location</label>
+          <input type="text" id="field-location" placeholder="City, State or Region" maxlength="80" />
+        </div>
+
+        <div class="field-group">
+          <label for="field-bio">Bio <span style="color:rgba(248,250,252,0.4)">(250 chars max)</span></label>
+          <textarea id="field-bio" maxlength="250" placeholder="A short intro about what you do…"></textarea>
+          <span class="char-count"><span id="bio-count">0</span> / 250</span>
+        </div>
+
+        <!-- Social links -->
+        <div class="section-title">Social &amp; Web</div>
+
+        <div class="social-field">
+          <span class="social-icon">🔗</span>
+          <input type="url" id="social-linkedin" placeholder="LinkedIn URL" />
+        </div>
+        <div class="social-field">
+          <span class="social-icon">𝕏</span>
+          <input type="url" id="social-twitter" placeholder="X / Twitter URL" />
+        </div>
+        <div class="social-field">
+          <span class="social-icon">🌐</span>
+          <input type="url" id="social-website" placeholder="Personal or portfolio website" />
+        </div>
+
+        <button id="save-btn" class="btn-primary">Save Profile</button>
+        <div id="save-msg" class="save-msg hidden"></div>
+      </div>
+    </div>
+
+    <script>
+    const TOKEN_KEY = 'ps_token';
+    let selectedType = null;
+    let isOwner = false;
+
+    // ── Determine whose profile we're viewing ─────────────────────────────────
+    function getTargetUserId() {
+      // /profile           → own profile
+      // /profile/<user_id> → public profile view
+      const parts = window.location.pathname.split('/').filter(Boolean);
+      return parts.length >= 2 ? parts[1] : null;
+    }
+
+    // ── User type selector ────────────────────────────────────────────────────
+    document.querySelectorAll('.type-option').forEach(el => {
+      el.addEventListener('click', () => {
+        if (!isOwner) return;
+        selectType(el.dataset.type);
+      });
+    });
+
+    function selectType(type) {
+      selectedType = type;
+      document.getElementById('type-og').className =
+        'type-option' + (type === 'og' ? ' selected-og' : '');
+      document.getElementById('type-dg').className =
+        'type-option' + (type === 'dg' ? ' selected-dg' : '');
+    }
+
+    // ── Bio character counter ─────────────────────────────────────────────────
+    document.getElementById('field-bio').addEventListener('input', function() {
+      document.getElementById('bio-count').textContent = this.value.length;
+    });
+
+    // ── Populate form from profile data ───────────────────────────────────────
+    function populateForm(profile) {
+      document.getElementById('field-email').value  = profile.email || '';
+      document.getElementById('field-company').value = profile.company_name || '';
+      document.getElementById('field-location').value = profile.location || '';
+      document.getElementById('field-bio').value    = profile.bio || '';
+      document.getElementById('bio-count').textContent = (profile.bio || '').length;
+
+      const links = profile.social_links || {};
+      document.getElementById('social-linkedin').value = links.linkedin || '';
+      document.getElementById('social-twitter').value  = links.twitter  || '';
+      document.getElementById('social-website').value  = links.website  || '';
+
+      if (profile.user_type) selectType(profile.user_type);
+    }
+
+    // ── Save profile ──────────────────────────────────────────────────────────
+    document.getElementById('save-btn').addEventListener('click', async () => {
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (!token) return;
+
+      const bio = document.getElementById('field-bio').value.trim();
+      const payload = {
+        user_type:    selectedType,
+        company_name: document.getElementById('field-company').value.trim() || null,
+        location:     document.getElementById('field-location').value.trim() || null,
+        bio:          bio || null,
+        social_links: {
+          linkedin: document.getElementById('social-linkedin').value.trim() || null,
+          twitter:  document.getElementById('social-twitter').value.trim()  || null,
+          website:  document.getElementById('social-website').value.trim()  || null,
+        },
+      };
+
+      // Strip null social links
+      Object.keys(payload.social_links).forEach(k => {
+        if (!payload.social_links[k]) delete payload.social_links[k];
+      });
+
+      const saveBtn = document.getElementById('save-btn');
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving…';
+
+      try {
+        const resp = await fetch('/api/profile', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        });
+
+        const data = await resp.json();
+        if (resp.ok) {
+          showSaveMsg('Profile saved!', 'success');
+        } else {
+          showSaveMsg(data.detail || 'Save failed. Please try again.', 'error');
+        }
+      } catch (_) {
+        showSaveMsg('Network error. Please try again.', 'error');
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save Profile';
+      }
+    });
+
+    function showSaveMsg(text, type) {
+      const el = document.getElementById('save-msg');
+      el.textContent = text;
+      el.className = `save-msg ${type}`;
+      el.classList.remove('hidden');
+      setTimeout(() => el.classList.add('hidden'), 4000);
+    }
+
+    // ── Init ───────────────────────────────────────────────────────────────────
+    async function init() {
+      const token = localStorage.getItem(TOKEN_KEY);
+      const authBtn = document.getElementById('nav-auth-btn');
+      const profileLink = document.getElementById('nav-profile-link');
+      const targetId = getTargetUserId();
+
+      let currentUser = null;
+      if (token) {
+        try {
+          const resp = await fetch('/auth/me', { headers: { Authorization: `Bearer ${token}` } });
+          if (resp.ok) {
+            currentUser = await resp.json();
+            authBtn.textContent = 'Sign Out';
+            profileLink.classList.remove('hidden');
+          }
+        } catch (_) {}
+      }
+
+      authBtn.addEventListener('click', () => {
+        if (currentUser) {
+          localStorage.removeItem(TOKEN_KEY);
+          window.location.reload();
+        } else {
+          window.location.href = '/';
+        }
+      });
+
+      // Decide what to load: own profile or public view
+      if (!targetId) {
+        // /profile — own profile
+        if (!currentUser) {
+          window.location.href = '/';
+          return;
+        }
+        isOwner = true;
+        showProfile(currentUser);
+      } else {
+        // /profile/<user_id> — public view
+        isOwner = currentUser && currentUser.id === targetId;
+        try {
+          const resp = await fetch(`/api/profile/${targetId}`);
+          if (!resp.ok) {
+            document.getElementById('not-found-msg').classList.remove('hidden');
+            return;
+          }
+          const profile = await resp.json();
+          showProfile(profile);
+          if (!isOwner) {
+            document.getElementById('page-title').innerHTML =
+              `${profile.email.split('@')[0]}'s Profile<span>.</span>`;
+            document.getElementById('page-subtitle').textContent =
+              profile.user_type === 'og' ? 'Print Operator' : profile.user_type === 'dg' ? 'Designer / Prepress' : '';
+            document.getElementById('profile-card').classList.add('view-only');
+          }
+        } catch (_) {
+          document.getElementById('not-found-msg').classList.remove('hidden');
+        }
+      }
+    }
+
+    function showProfile(profile) {
+      populateForm(profile);
+      document.getElementById('profile-card').classList.remove('hidden');
+    }
+
+    init();
+    </script>
+  </body>
+</html>

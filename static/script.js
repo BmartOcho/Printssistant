@@ -2,6 +2,7 @@
 let currentUser = null;
 const TOKEN_KEY = 'ps_token';
 let authMode = 'signin'; // 'signin' | 'signup'
+let selectedUserType = null; // 'og' | 'dg' — captured during signup
 
 // ── DOM References ───────────────────────────────────────────────────────────
 const dropZone = document.getElementById('drop-zone');
@@ -108,7 +109,12 @@ function getAuthHeaders() {
 
 async function handleAuthSuccess(data) {
     localStorage.setItem(TOKEN_KEY, data.access_token);
-    currentUser = { email: data.email, is_pro: data.is_pro, monthly_jobs: data.monthly_jobs };
+    currentUser = {
+        email: data.email,
+        is_pro: data.is_pro,
+        monthly_jobs: data.monthly_jobs,
+        user_type: data.user_type,
+    };
     hideAuthModal();
     updateUIForAuthState();
     // If they were trying to use a tool, let them continue
@@ -143,16 +149,19 @@ function hideAuthModal() {
 }
 
 function updateUIForAuthState() {
+    const navProfileLink = document.getElementById('nav-profile-link');
     if (!currentUser) {
         // Not logged in — hide user bar, show "Sign In" button
         userBar.classList.add('hidden');
         navAuthBtn.textContent = 'Sign In';
+        if (navProfileLink) navProfileLink.classList.add('hidden');
         return;
     }
 
     // Logged in — show user bar, show "Sign Out" button
     userBar.classList.remove('hidden');
     navAuthBtn.textContent = 'Sign Out';
+    if (navProfileLink) navProfileLink.classList.remove('hidden');
 
     if (currentUser.is_pro) {
         userInfoText.textContent = `${currentUser.email} ⚡ Pro`;
@@ -197,22 +206,37 @@ function showFreeLimitReached() {
 authToggleLink.addEventListener('click', (e) => {
     e.preventDefault();
     authMode = authMode === 'signin' ? 'signup' : 'signin';
+    const userTypeRow = document.getElementById('user-type-row');
     if (authMode === 'signup') {
         authModalTitle.textContent = 'Create Account';
         authModalSubtitle.textContent = 'It\'s free — no credit card needed';
         authSubmitBtn.textContent = 'Create Account';
         authToggleLink.textContent = 'Sign in instead';
         authToggleLink.previousSibling.textContent = 'Already have an account? ';
-        forgotPasswordText.style.display = 'none'; // Hide forgot password in signup mode
+        forgotPasswordText.style.display = 'none';
+        if (userTypeRow) userTypeRow.style.display = 'block';
     } else {
         authModalTitle.textContent = 'Sign In';
         authModalSubtitle.textContent = 'Access your Printssistant tools';
         authSubmitBtn.textContent = 'Sign In';
         authToggleLink.textContent = 'Create one free';
         authToggleLink.previousSibling.textContent = "Don't have an account? ";
-        forgotPasswordText.style.display = 'block'; // Show forgot password in signin mode
+        forgotPasswordText.style.display = 'block';
+        if (userTypeRow) userTypeRow.style.display = 'none';
+        selectedUserType = null;
     }
     authError.classList.add('hidden');
+});
+
+// ── User type button wiring (signup modal) ─────────────────────────────────
+['og', 'dg'].forEach(type => {
+    const btn = document.getElementById(`type-${type}-btn`);
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        selectedUserType = type;
+        document.querySelectorAll('.user-type-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+    });
 });
 
 authSubmitBtn.addEventListener('click', async () => {
@@ -230,10 +254,12 @@ authSubmitBtn.addEventListener('click', async () => {
 
     try {
         const endpoint = authMode === 'signin' ? '/auth/signin' : '/auth/signup';
+        const body = { email, password };
+        if (authMode === 'signup' && selectedUserType) body.user_type = selectedUserType;
         const resp = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password }),
+            body: JSON.stringify(body),
         });
         const data = await resp.json();
 
