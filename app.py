@@ -1056,6 +1056,28 @@ async def download_file(
     return FileResponse(file_path, filename=safe_name)
 
 
+# ── Global Exception Handler ─────────────────────────────────────────────────
+import logging
+import traceback
+
+logger = logging.getLogger(__name__)
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """
+    Global exception handler that sanitizes stack traces from HTTP responses
+    while logging the full trace internally for debugging.
+    """
+    # Log full exception server-side
+    logger.error(f"Unhandled exception: {traceback.format_exc()}")
+    
+    # Return sanitized response to client (no stack trace)
+    return JSONResponse(
+        status_code=500,
+        content={"status": "error", "message": "An internal error occurred. Please try again later."}
+    )
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
