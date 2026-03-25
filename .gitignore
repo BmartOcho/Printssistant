@@ -18,3 +18,8 @@ _Test Files/
 # IDEs
 .vscode/
 .idea/
+
+# Local dev env — never commit real credentials
+.env
+.env.local
+.env*.local

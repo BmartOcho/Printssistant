@@ -1,4 +1,17 @@
 import os
+import sys
+
+# Ensure stdout handles Unicode (emoji etc.) on Windows
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
+# Load .env for local development (no-op if file absent or dotenv not installed)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 import asyncio
 import shutil
 import zipfile
@@ -19,7 +32,7 @@ from even_odd_logic import generate_even_odd
 from vectorizer import engine as vectorizer_engine
 from presets import get_preset
 from swatchset_logic import generate_swatchset
-from auth import get_current_user, require_pro, check_free_limit, create_access_token
+from auth import get_current_user, require_pro, check_free_limit, create_access_token, security
 from db import (
     supabase, increment_job_count, log_job_history,
     update_user_profile, get_public_profile,
