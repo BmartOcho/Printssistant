@@ -721,6 +721,57 @@ async def get_preflight_result(job_id: str):
     return job
 
 
+@app.get("/api/preflight/quota")
+async def get_preflight_quota(request: Request, credentials = Depends(security)):
+    """
+    Get remaining preflight checks for current user/IP.
+    Returns: {tier, remaining, limit}
+    """
+    ip = request.client.host if request.client else "unknown"
+    
+    # Resolve auth (optional — anonymous is allowed)
+    user = None
+    is_pro = False
+    if credentials:
+        try:
+            from auth import SECRET_KEY, ALGORITHM
+            from jose import jwt as jose_jwt
+            payload = jose_jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+            user_id = payload.get("sub")
+            if user_id:
+                from db import get_user_record
+                user = get_user_record(user_id)
+                is_pro = (user or {}).get("is_pro", False)
+        except Exception:
+            pass  # treat as anonymous if token is bad
+    
+    if user and is_pro:
+        # Pro users: unlimited
+        return {
+            "tier": "pro",
+            "remaining": 999999,  # effectively unlimited
+            "limit": 999999
+        }
+    elif user:
+        # Free users: 5 per month
+        used = get_preflight_count_month(user["id"])
+        remaining = max(0, PREFLIGHT_FREE_LIMIT_MONTH - used)
+        return {
+            "tier": "free",
+            "remaining": remaining,
+            "limit": PREFLIGHT_FREE_LIMIT_MONTH
+        }
+    else:
+        # Anonymous: 1 per day per IP
+        used = get_preflight_count_today(ip)
+        remaining = max(0, PREFLIGHT_ANON_LIMIT_DAY - used)
+        return {
+            "tier": "anonymous",
+            "remaining": remaining,
+            "limit": PREFLIGHT_ANON_LIMIT_DAY
+        }
+
+
 # ── Stripe Webhook ────────────────────────────────────────────────────────────
 
 @app.post("/webhook/stripe")
