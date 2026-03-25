@@ -711,7 +711,9 @@ async def get_preflight_result(job_id: str):
     """Fetch a completed preflight result by job ID (shareable link)."""
     job = get_preflight_job(job_id)
     if not job:
-        raise HTTPException(status_code=404, detail="Preflight result not found or expired.")
+        raise HTTPException(status_code=404, detail="Preflight result not found.")
+    if job.get("status") == "expired":
+        raise HTTPException(status_code=410, detail="This preflight result has expired.")
     return job
 
 

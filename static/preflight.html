@@ -433,8 +433,22 @@
       try {
         const resp = await fetch(`/api/preflight/${jobId}`);
         const data = await resp.json();
+
+        if (resp.status === 410) {
+          showError('This preflight result has expired. Please run a new check.');
+          return;
+        }
+        if (resp.status === 404) {
+          showError('Preflight result not found. The link may be invalid.');
+          return;
+        }
         if (!resp.ok) {
           showError(data.detail || 'Result not found.');
+          return;
+        }
+        // Job is still processing — tell the user to wait
+        if (data.status === 'processing') {
+          showError('Still processing — try again in a few seconds.');
           return;
         }
         // Merge filename from DB

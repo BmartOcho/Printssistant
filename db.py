@@ -113,14 +113,47 @@ def fail_preflight_job(job_id: str, error: str) -> None:
     }).eq("id", job_id).execute()
 
 
-def get_preflight_job(job_id: str) -> dict | None:
-    result = (
-        supabase.table("preflight_jobs")
-        .select("id, user_id, filename, file_size, results, status, created_at, page_count")
-        .eq("id", job_id)
-        .single()
-        .execute()
-    )
+def get_preflight_job(job_id: str, retries: int = 3) -> dict | None:
+    """
+    Fetch a preflight job by ID with retry logic for race conditions.
+
+    When a share link is opened while the job is still processing,
+    we retry up to `retries` times with 100ms delays to give the
+    background task time to complete. Returns None if the job doesn't
+    exist, or the job dict (which may include expired status).
+    """
+    import time
+    import datetime
+
+    for attempt in range(retries):
+        result = (
+            supabase.table("preflight_jobs")
+            .select("id, user_id, filename, file_size, results, status, created_at, expires_at, page_count")
+            .eq("id", job_id)
+            .single()
+            .execute()
+        )
+        if not result.data:
+            return None
+
+        job = result.data
+
+        # Check expiry
+        expires_at = job.get("expires_at")
+        if expires_at:
+            now = datetime.datetime.now(datetime.timezone.utc)
+            exp_dt = datetime.datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+            if now > exp_dt:
+                job["status"] = "expired"
+                return job
+
+        # If still processing and we have retries left, wait and retry
+        if job["status"] == "processing" and attempt < retries - 1:
+            time.sleep(0.1)  # 100ms delay between retries
+            continue
+
+        return job
+
     return result.data if result.data else None
 
 
