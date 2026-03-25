@@ -3,7 +3,9 @@
     "allow": [
       "Bash(bash \"C:/Users/Benjamin/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.2/skills/brainstorming/scripts/start-server.sh\" --project-dir \"C:/Users/Benjamin/Desktop/Python Apps/printssistant/.claude/worktrees/great-chandrasekhar\")",
       "Bash(grep -E '\\\\.\\(py|txt|json|html|css|js|md\\)$')",
-      "Bash(\"C:\\\\Users\\\\Benjamin\\\\Desktop\\\\Python Apps\\\\printssistant\\\\static\\\\style.css\")"
+      "Bash(\"C:\\\\Users\\\\Benjamin\\\\Desktop\\\\Python Apps\\\\printssistant\\\\static\\\\style.css\")",
+      "Skill(commit-commands:commit)",
+      "Skill(commit-commands:commit:*)"
     ]
   }
 }

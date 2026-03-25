@@ -3,7 +3,7 @@ import os
 import sys
 import logging
 from pathlib import Path
-from PyPDF2 import PdfReader, PdfWriter
+from pypdf import PdfReader, PdfWriter
 
 # Set up logging
 logging.basicConfig(

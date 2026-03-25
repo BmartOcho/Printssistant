@@ -7,7 +7,15 @@ from db import supabase, get_user_record
 
 FREE_TIER_LIMIT = 20  # jobs per month for free users
 
-SECRET_KEY = os.environ.get("JWT_SECRET", "printssistant-secret-please-set-jwt-secret-env-var")
+# JWT_SECRET is required and must be explicitly set in environment
+SECRET_KEY = os.environ.get("JWT_SECRET")
+if not SECRET_KEY:
+    raise RuntimeError(
+        "CRITICAL: JWT_SECRET environment variable is not set. "
+        "This is required for secure token generation and validation. "
+        "Set JWT_SECRET in your environment before starting the application."
+    )
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 30
 
