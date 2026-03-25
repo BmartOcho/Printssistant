@@ -642,6 +642,10 @@ async def run_preflight_check(
     pdf_bytes = await file.read()
     file_size = len(pdf_bytes)
 
+    # ── PDF magic byte validation ─────────────────────────────────────────────
+    if pdf_bytes[:4] != b'%PDF':
+        raise HTTPException(status_code=400, detail="Invalid PDF file. File does not appear to be a valid PDF.")
+
     if file_size > max_size:
         limit_mb = max_size // (1024 * 1024)
         raise HTTPException(
