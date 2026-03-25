@@ -441,12 +441,8 @@ async function handleUpload(file) {
     cropperSettings.classList.add('hidden');
     vectorizerSettings.classList.add('hidden');
     progressContainer.classList.remove('hidden');
-    statusText.innerText = `Processing ${file.name}...`;
-
-    let progress = 0;
-    const intervalAnim = setInterval(() => {
-        if (progress < 90) { progress += 5; progressFill.style.width = `${progress}%`; }
-    }, 100);
+    statusText.innerText = `Uploading ${file.name}...`;
+    progressFill.style.width = '0%';
 
     const formData = new FormData();
     let endpoint = '/upload';
@@ -470,19 +466,46 @@ async function handleUpload(file) {
         endpoint = '/vectorize';
     }
 
+    // Use XMLHttpRequest for real upload progress tracking
+    const xhr = new XMLHttpRequest();
+
+    const uploadPromise = new Promise((resolve, reject) => {
+        xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+                const pct = Math.round((e.loaded / e.total) * 90); // 0-90% for upload
+                progressFill.style.width = `${pct}%`;
+                statusText.innerText = `Uploading ${file.name}... ${pct}%`;
+            }
+        };
+
+        xhr.upload.onload = () => {
+            progressFill.style.width = '90%';
+            statusText.innerText = 'Processing...';
+        };
+
+        xhr.onload = () => {
+            resolve({ status: xhr.status, response: xhr.responseText });
+        };
+
+        xhr.onerror = () => reject(new Error('Network error'));
+        xhr.ontimeout = () => reject(new Error('Request timed out'));
+
+        xhr.open('POST', endpoint);
+        // Set auth headers (skip Content-Type — FormData sets it with boundary)
+        const token = localStorage.getItem(TOKEN_KEY);
+        if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.send(formData);
+    });
+
     try {
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: getAuthHeaders(),
-            body: formData
-        });
+        const { status, response: responseText } = await uploadPromise;
 
-        clearInterval(intervalAnim);
+        // Handle auth errors
+        if (status === 401) { showAuthModal(); resetUI(); return; }
+        if (status === 403) { showProUpgradeInCard(); return; }
+        if (status === 429) { showFreeLimitReached(); return; }
 
-        const handled = await handleAuthError(response);
-        if (handled) return;
-
-        const data = await response.json();
+        const data = JSON.parse(responseText);
         progressFill.style.width = '100%';
 
         if (data.status === 'success') {
@@ -496,7 +519,6 @@ async function handleUpload(file) {
             resetUI();
         }
     } catch (err) {
-        clearInterval(intervalAnim);
         alert('Failed to connect to server.');
         resetUI();
     }
