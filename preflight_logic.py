@@ -39,8 +39,51 @@ def _page_list(pages: list[int]) -> str:
 
 # ── Check 1: File Size ────────────────────────────────────────────────────────
 
-def check_file_size(file_size: int) -> dict[str, str]:
+def check_file_size(file_size: int, doc: fitz.Document | None = None) -> dict[str, str]:
+    """
+    Smart file size check based on ideal 300 DPI calculation.
+
+    Calculates the ideal uncompressed file size for a 300 DPI CMYK document
+    using trim box dimensions:
+        ideal_MB = ((300 * width_in * 300 * height_in * 8) / 8 * num_pages) / 1048576
+
+    If actual file size > ideal, warns that images may need optimisation.
+    If actual <= ideal, passes — the file is within expected bounds.
+    Falls back to the static 25 MB threshold if trim box data is unavailable.
+    """
     mb = file_size / (1024 * 1024)
+
+    if doc is not None and len(doc) > 0:
+        num_pages = len(doc)
+        # Use first page trim box for reference dimensions
+        page = doc[0]
+        tb = page.trimbox
+        width_inches = tb.width / 72.0
+        height_inches = tb.height / 72.0
+
+        if width_inches > 0 and height_inches > 0:
+            # Ideal uncompressed size: 300 DPI, 8 bytes per pixel (CMYK 16-bit)
+            # Formula: (300 * W * 300 * H * 8) / 8 * pages / 1048576
+            # Simplifies to: (300 * W * 300 * H * pages) / 1048576
+            ideal_bytes = (300 * width_inches * 300 * height_inches * 8) / 8 * num_pages
+            ideal_mb = ideal_bytes / 1048576
+
+            if file_size > ideal_bytes:
+                return _result(
+                    "warn",
+                    f"Large file ({mb:.1f} MB)",
+                    f"Expected ≤ {ideal_mb:.1f} MB for {width_inches:.1f}\" × {height_inches:.1f}\" "
+                    f"at 300 DPI ({num_pages} page{'s' if num_pages != 1 else ''}). "
+                    f"Consider optimising images to reduce file size.",
+                )
+            return _result(
+                "pass",
+                f"File size OK ({mb:.1f} MB)",
+                f"Within ideal range for {width_inches:.1f}\" × {height_inches:.1f}\" "
+                f"at 300 DPI ({num_pages} page{'s' if num_pages != 1 else ''}).",
+            )
+
+    # Fallback: no trim box data available, use static threshold
     if file_size >= WARN_FILE_SIZE:
         return _result(
             "warn",
@@ -242,7 +285,7 @@ def run_preflight(pdf_bytes: bytes, file_size: int) -> dict[str, Any]:
     page_count = len(doc)
 
     checks = {
-        "file_size":    check_file_size(file_size),
+        "file_size":    check_file_size(file_size, doc),
         "bleeds":       check_bleeds(doc),
         "color_mode":   check_color_mode(doc),
         "safe_margins": check_safe_margins(doc),

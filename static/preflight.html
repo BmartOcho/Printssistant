@@ -298,7 +298,7 @@
         localStorage.removeItem(TOKEN_KEY);
       }
       authBtn.textContent = 'Sign In';
-      authBtn.onclick = () => window.location.href = '/';
+      authBtn.onclick = () => showPreflightAuthModal();
       return null;
     }
 
@@ -433,8 +433,22 @@
       try {
         const resp = await fetch(`/api/preflight/${jobId}`);
         const data = await resp.json();
+
+        if (resp.status === 410) {
+          showError('This preflight result has expired. Please run a new check.');
+          return;
+        }
+        if (resp.status === 404) {
+          showError('Preflight result not found. The link may be invalid.');
+          return;
+        }
         if (!resp.ok) {
           showError(data.detail || 'Result not found.');
+          return;
+        }
+        // Job is still processing — tell the user to wait
+        if (data.status === 'processing') {
+          showError('Still processing — try again in a few seconds.');
           return;
         }
         // Merge filename from DB
@@ -454,12 +468,152 @@
       }
     });
 
+    // ── Auth Modal for Preflight Page ──────────────────────────────────────────
+    function showPreflightAuthModal() {
+      const existing = document.getElementById('preflight-auth-modal');
+      if (existing) existing.remove();
+
+      const modal = document.createElement('div');
+      modal.id = 'preflight-auth-modal';
+      modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(4px);';
+      modal.innerHTML = `
+        <div style="background:var(--glass-bg,#1a1a2e);border:1px solid var(--glass-border,rgba(255,255,255,0.1));border-radius:12px;padding:2rem;max-width:400px;width:90%;color:#f8fafc;position:relative;">
+          <button id="pf-auth-close" style="position:absolute;top:0.75rem;right:0.75rem;background:none;border:none;color:rgba(248,250,252,0.6);font-size:1.3rem;cursor:pointer;">&times;</button>
+          <h3 id="pf-auth-title" style="margin:0 0 0.25rem;font-size:1.3rem;font-weight:700;">Sign In</h3>
+          <p style="color:rgba(248,250,252,0.5);font-size:0.85rem;margin-bottom:1.25rem;">Access your Printssistant tools</p>
+          <input id="pf-auth-email" type="email" placeholder="Email" style="width:100%;padding:0.6rem;margin-bottom:0.75rem;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:#f8fafc;font-size:0.9rem;box-sizing:border-box;" />
+          <input id="pf-auth-pass" type="password" placeholder="Password" style="width:100%;padding:0.6rem;margin-bottom:0.75rem;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:#f8fafc;font-size:0.9rem;box-sizing:border-box;" />
+          <button id="pf-auth-submit" style="width:100%;padding:0.65rem;border:none;border-radius:8px;background:var(--primary-light,#c13584);color:white;font-weight:600;font-size:0.95rem;cursor:pointer;">Sign In</button>
+          <p id="pf-auth-error" style="text-align:center;margin-top:0.75rem;font-size:0.85rem;color:#f87171;display:none;"></p>
+          <p style="text-align:center;margin-top:0.75rem;font-size:0.85rem;color:rgba(248,250,252,0.5);">Don't have an account? <a href="/" style="color:var(--primary-light,#c13584);">Create one free</a></p>
+        </div>
+      `;
+      document.body.appendChild(modal);
+
+      modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+      document.getElementById('pf-auth-close').addEventListener('click', () => modal.remove());
+
+      const emailInput = document.getElementById('pf-auth-email');
+      const passInput = document.getElementById('pf-auth-pass');
+      emailInput.focus();
+
+      // Allow Enter to submit
+      [emailInput, passInput].forEach(el => {
+        el.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') document.getElementById('pf-auth-submit').click();
+        });
+      });
+
+      document.getElementById('pf-auth-submit').addEventListener('click', async () => {
+        const email = emailInput.value.trim();
+        const password = passInput.value;
+        const errEl = document.getElementById('pf-auth-error');
+
+        if (!email || !password) {
+          errEl.textContent = 'Please enter email and password.';
+          errEl.style.display = 'block';
+          return;
+        }
+
+        try {
+          const resp = await fetch('/auth/signin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password }),
+          });
+          const data = await resp.json();
+          if (!resp.ok) {
+            errEl.textContent = data.detail || 'Sign in failed.';
+            errEl.style.display = 'block';
+            return;
+          }
+          localStorage.setItem(TOKEN_KEY, data.access_token);
+          modal.remove();
+          window.location.reload(); // reload to reflect auth state
+        } catch {
+          errEl.textContent = 'Network error. Please try again.';
+          errEl.style.display = 'block';
+        }
+      });
+    }
+
     document.getElementById('nav-auth-btn').addEventListener('click', function() {
       if (this.textContent === 'Sign Out') {
         localStorage.removeItem(TOKEN_KEY);
         window.location.reload();
       } else {
-        window.location.href = '/';
+        showPreflightAuthModal();
+      }
+    });
+
+    // ── Suggest Idea Modal ────────────────────────────────────────────────────
+    function showSuggestIdeaModal() {
+      const existing = document.getElementById('suggest-idea-modal');
+      if (existing) existing.remove();
+
+      const modal = document.createElement('div');
+      modal.id = 'suggest-idea-modal';
+      modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(4px);';
+      modal.innerHTML = `
+        <div style="background:var(--glass-bg,#1a1a2e);border:1px solid var(--glass-border,rgba(255,255,255,0.1));border-radius:12px;padding:2rem;max-width:480px;width:90%;color:#f8fafc;position:relative;">
+          <button id="suggest-close" style="position:absolute;top:0.75rem;right:0.75rem;background:none;border:none;color:rgba(248,250,252,0.6);font-size:1.3rem;cursor:pointer;">&times;</button>
+          <h3 style="margin:0 0 0.5rem;font-size:1.3rem;font-weight:700;">Suggest an Idea</h3>
+          <p style="color:rgba(248,250,252,0.6);font-size:0.9rem;margin-bottom:1.25rem;">Have a feature idea or improvement? We'd love to hear it!</p>
+          <textarea id="suggest-text" rows="4" placeholder="Describe your idea..." style="width:100%;padding:0.65rem;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:#f8fafc;font-size:0.9rem;resize:vertical;box-sizing:border-box;"></textarea>
+          <button id="suggest-submit" style="margin-top:1rem;width:100%;padding:0.65rem;border:none;border-radius:8px;background:var(--primary-light,#c13584);color:white;font-weight:600;font-size:0.95rem;cursor:pointer;">Submit Idea</button>
+          <p id="suggest-status" style="text-align:center;margin-top:0.75rem;font-size:0.85rem;color:rgba(248,250,252,0.5);display:none;"></p>
+        </div>
+      `;
+      document.body.appendChild(modal);
+
+      modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+      document.getElementById('suggest-close').addEventListener('click', () => modal.remove());
+
+      document.getElementById('suggest-submit').addEventListener('click', async () => {
+        const text = document.getElementById('suggest-text').value.trim();
+        const statusEl = document.getElementById('suggest-status');
+        if (!text) {
+          statusEl.textContent = 'Please enter your idea first.';
+          statusEl.style.display = 'block';
+          statusEl.style.color = '#f87171';
+          return;
+        }
+        statusEl.textContent = 'Submitting...';
+        statusEl.style.display = 'block';
+        statusEl.style.color = 'rgba(248,250,252,0.5)';
+
+        try {
+          const token = localStorage.getItem(TOKEN_KEY);
+          const headers = { 'Content-Type': 'application/json' };
+          if (token) headers['Authorization'] = `Bearer ${token}`;
+          const resp = await fetch('/api/suggest-idea', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ idea: text }),
+          });
+          if (resp.ok) {
+            statusEl.textContent = 'Thanks! Your idea has been submitted.';
+            statusEl.style.color = '#4ade80';
+            document.getElementById('suggest-text').value = '';
+            setTimeout(() => modal.remove(), 2000);
+          } else {
+            statusEl.textContent = 'Could not submit. Please try again.';
+            statusEl.style.color = '#f87171';
+          }
+        } catch {
+          statusEl.textContent = 'Network error. Please try again.';
+          statusEl.style.color = '#f87171';
+        }
+      });
+    }
+
+    // Intercept "Suggest an Idea" nav link
+    document.querySelectorAll('a.nav-link').forEach(link => {
+      if (link.getAttribute('href') === '/suggest-idea') {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          showSuggestIdeaModal();
+        });
       }
     });
     </script>
