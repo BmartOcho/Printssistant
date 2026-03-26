@@ -300,11 +300,11 @@
         }
       });
 
-      // Wire up nav sign-in
+      // Wire up nav sign-in — redirect to home page and open auth modal
       const navSignIn = document.getElementById('nav-sign-in');
       navSignIn.addEventListener('click', (e) => {
         e.preventDefault();
-        alert('Sign in functionality would go here - redirect to home auth modal');
+        window.location.href = '/?signin=true';
       });
 
       // Dynamically adjust padding for navbar height

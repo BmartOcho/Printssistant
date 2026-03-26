@@ -82,6 +82,7 @@ async function initApp() {
     if (!token) {
         // Not logged in — that's fine, let them browse
         updateUIForAuthState();
+        maybeOpenSignInFromParam();
         return;
     }
     try {
@@ -89,6 +90,7 @@ async function initApp() {
         if (!me.ok) {
             localStorage.removeItem(TOKEN_KEY);
             updateUIForAuthState();
+            maybeOpenSignInFromParam();
             return;
         }
         currentUser = await me.json();
@@ -96,6 +98,18 @@ async function initApp() {
     } catch (err) {
         console.error('Failed to restore session:', err);
         updateUIForAuthState();
+        maybeOpenSignInFromParam();
+    }
+}
+
+function maybeOpenSignInFromParam() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('signin') === 'true') {
+        // Remove the param from the URL without a page reload
+        history.replaceState(null, '', window.location.pathname);
+        if (!currentUser) {
+            showAuthModal();
+        }
     }
 }
 
