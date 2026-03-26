@@ -166,6 +166,7 @@ TEMP_DIR = Path(tempfile.gettempdir())
 
 UPLOAD_DIR = TEMP_DIR / "uploads"
 PROCESSED_DIR = TEMP_DIR / "processed_web"
+DOWNLOAD_RETENTION_SECONDS = 600
 
 UPLOAD_DIR.mkdir(exist_ok=True)
 PROCESSED_DIR.mkdir(exist_ok=True)
@@ -190,6 +191,12 @@ def cleanup_files(*file_paths: Path):
             print(f"⚠️  Failed to delete {file_path}: {e}")
 
 
+async def cleanup_files_later(delay_seconds: int, *file_paths: Path):
+    """Delete temporary files after a delay to allow follow-up download requests."""
+    await asyncio.sleep(delay_seconds)
+    cleanup_files(*file_paths)
+
+
 # ── Root ────────────────────────────────────────────────────────────────────
 
 @app.get("/")
@@ -205,11 +212,6 @@ async def forgot_password_page():
 @app.get("/reset-password")
 async def reset_password_page():
     return FileResponse(BASE_DIR / "static" / "reset-password.html")
-
-
-@app.get("/blog")
-async def blog_page():
-    return FileResponse(BASE_DIR / "static" / "blog.html")
 
 
 @app.get("/suggest-idea")
@@ -924,6 +926,8 @@ async def upload_pdf(
         background_tasks.add_task(log_job_history, user["id"], "duplexer", file_size, processing_ms)
         # Clean up original upload after response
         background_tasks.add_task(cleanup_files, file_path)
+        # Keep processed file briefly so /download/{filename} can fetch it.
+        background_tasks.add_task(cleanup_files_later, DOWNLOAD_RETENTION_SECONDS, output_path)
         return {"status": "success", "filename": output_filename}
     else:
         # Clean up on error too
@@ -970,16 +974,22 @@ async def crop_pdf(
         increment_job_count(user["id"])
         # Log job history in background
         background_tasks.add_task(log_job_history, user["id"], "cropper", file_size, processing_ms)
-        # Clean up original and cropped files after response
-        cleanup_paths = [file_path, zip_path] + [PROCESSED_DIR / f for f in cropped_files]
-        background_tasks.add_task(cleanup_files, *cleanup_paths)
+        # Clean up original upload after response
+        background_tasks.add_task(cleanup_files, file_path)
+        # Keep processed files briefly so /download/{filename} can fetch them.
+        output_paths = [zip_path] + [PROCESSED_DIR / f for f in cropped_files]
+        background_tasks.add_task(cleanup_files_later, DOWNLOAD_RETENTION_SECONDS, *output_paths)
         return {"status": "success", "filename": zip_filename}
 
     increment_job_count(user["id"])
     # Log job history in background
     background_tasks.add_task(log_job_history, user["id"], "cropper", file_size, processing_ms)
-    # Clean up original and cropped file after response
-    background_tasks.add_task(cleanup_files, file_path, PROCESSED_DIR / cropped_files[0])
+    # Clean up original upload after response
+    background_tasks.add_task(cleanup_files, file_path)
+    # Keep processed file briefly so /download/{filename} can fetch it.
+    background_tasks.add_task(
+        cleanup_files_later, DOWNLOAD_RETENTION_SECONDS, PROCESSED_DIR / cropped_files[0]
+    )
     return {"status": "success", "filename": cropped_files[0]}
 
 
@@ -1030,6 +1040,8 @@ async def insert_pdf(
         background_tasks.add_task(log_job_history, user["id"], "insert", total_file_size, processing_ms)
         # Clean up original upload files after response
         background_tasks.add_task(cleanup_files, base_path, insert_path)
+        # Keep processed file briefly so /download/{filename} can fetch it.
+        background_tasks.add_task(cleanup_files_later, DOWNLOAD_RETENTION_SECONDS, output_path)
         return {"status": "success", "filename": output_filename}
     else:
         # Clean up on error too
@@ -1091,8 +1103,8 @@ async def vectorize_image(
 
         # Log job history in background
         background_tasks.add_task(log_job_history, user["id"], "vectorizer", file_size, processing_ms)
-        # Cleanup SVG file after response is sent
-        background_tasks.add_task(cleanup_files, svg_path)
+        # Keep file briefly so /download/{filename} can fetch it.
+        background_tasks.add_task(cleanup_files_later, DOWNLOAD_RETENTION_SECONDS, svg_path)
 
         return {
             "status": "success",
@@ -1151,12 +1163,12 @@ async def create_swatchset(
     )
     processing_ms = int((time.time() - start_time) * 1000)
 
-    # Cleanup output file after response is sent
-    background_tasks.add_task(cleanup_files, output_path)
 
     if success:
         # Log job history in background
         background_tasks.add_task(log_job_history, user["id"], "swatchset", ref_size, processing_ms)
+        # Keep processed file briefly so /download/{filename} can fetch it.
+        background_tasks.add_task(cleanup_files_later, DOWNLOAD_RETENTION_SECONDS, output_path)
         return {"status": "success", "filename": output_path.name}
     fmt_label = "EPS" if output_format == "eps" else "PDF"
     return {"status": "error", "message": f"Failed to generate swatch set {fmt_label}"}

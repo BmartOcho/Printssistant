@@ -24,7 +24,6 @@
       <div class="nav-container">
         <div class="nav-links">
           <a href="/" class="nav-link">Home</a>
-          <a href="/blog" class="nav-link">Blog</a>
           <a href="/suggest-idea" class="nav-link">Suggest an Idea</a>
         </div>
         <a href="#" id="nav-sign-in" class="nav-link nav-sign-in">Sign In</a>
@@ -303,9 +302,36 @@
 
       // Wire up nav sign-in
       const navSignIn = document.getElementById('nav-sign-in');
+      const TOKEN_KEY = 'ps_token';
+      let isSignedIn = false;
+
+      // Check if user is already signed in
+      async function checkAuth() {
+        const token = localStorage.getItem(TOKEN_KEY);
+        if (!token) return;
+        try {
+          const res = await fetch('/auth/me', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (!res.ok) {
+            localStorage.removeItem(TOKEN_KEY);
+            return;
+          }
+          const user = await res.json();
+          isSignedIn = true;
+          navSignIn.textContent = user.email;
+          navSignIn.style.cursor = 'default';
+        } catch (err) {
+          // Token invalid or network error — stay as "Sign In"
+        }
+      }
+      checkAuth();
+
       navSignIn.addEventListener('click', (e) => {
         e.preventDefault();
-        alert('Sign in functionality would go here - redirect to home auth modal');
+        if (!isSignedIn) {
+          window.location.href = '/?signin=true';
+        }
       });
 
       // Dynamically adjust padding for navbar height
