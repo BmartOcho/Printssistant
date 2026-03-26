@@ -195,11 +195,6 @@ async def reset_password_page():
     return FileResponse(BASE_DIR / "static" / "reset-password.html")
 
 
-@app.get("/blog")
-async def blog_page():
-    return FileResponse(BASE_DIR / "static" / "blog.html")
-
-
 @app.get("/suggest-idea")
 async def suggest_idea_page():
     return FileResponse(BASE_DIR / "static" / "suggest-idea.html")
