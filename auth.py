@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
@@ -55,6 +56,25 @@ async def get_current_user(
             detail="Invalid or expired session. Please log in again.",
         )
 
+    user_record = get_user_record(user_id)
+    return user_record or {"id": user_id, "email": email, "is_pro": False, "monthly_jobs": 0}
+
+
+async def get_optional_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+) -> Optional[dict]:
+    """Like get_current_user but returns None instead of raising 401 for missing/invalid tokens."""
+    if not credentials:
+        return None
+    token = credentials.credentials
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("sub")
+        email = payload.get("email")
+        if not user_id or not email:
+            return None
+    except JWTError:
+        return None
     user_record = get_user_record(user_id)
     return user_record or {"id": user_id, "email": email, "is_pro": False, "monthly_jobs": 0}
 

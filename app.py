@@ -32,7 +32,7 @@ from even_odd_logic import generate_even_odd
 from vectorizer import engine as vectorizer_engine
 from presets import get_preset
 from swatchset_logic import generate_swatchset
-from auth import get_current_user, require_pro, check_free_limit, create_access_token, security
+from auth import get_current_user, get_optional_user, require_pro, check_free_limit, create_access_token, security
 from db import (
     supabase, increment_job_count, log_job_history,
     update_user_profile, get_public_profile,
@@ -282,6 +282,45 @@ async def submit_suggestion(request: Request):
     except Exception as e:
         print(f"Error processing suggestion: {e}")
         raise HTTPException(status_code=500, detail="Error processing suggestion")
+
+
+@app.post("/api/suggest-idea")
+async def suggest_idea(request: Request, current_user: Optional[dict] = Depends(get_optional_user)):
+    """Submit a quick idea suggestion (from modal popup)."""
+    try:
+        body = await request.json()
+        idea = body.get("idea", "").strip()
+
+        if not idea:
+            raise HTTPException(status_code=400, detail="Idea cannot be empty")
+
+        # Get email from logged-in user or use Anonymous
+        email = current_user.get("email", "anonymous@printssistant.com") if current_user else "anonymous@printssistant.com"
+
+        # Store in Supabase
+        idea_data = {
+            "name": "Anonymous",
+            "email": email,
+            "title": idea[:100],  # First 100 chars as title
+            "description": idea,
+            "impact": "not specified",
+            "submitted_at": datetime.utcnow().isoformat(),
+            "status": "new",
+        }
+
+        try:
+            supabase.table("suggestions").insert(idea_data).execute()
+        except Exception as e:
+            print(f"Error storing idea: {e}")
+            print(f"💡 Quick idea received: {idea[:100]} from {email}")
+
+        return {"status": "success", "message": "Thanks! Your idea has been submitted."}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error processing idea: {e}")
+        raise HTTPException(status_code=500, detail="Error processing idea")
 
 
 # ── Auth ─────────────────────────────────────────────────────────────────────
