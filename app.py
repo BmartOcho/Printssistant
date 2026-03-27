@@ -271,7 +271,23 @@ async def submit_suggestion(request: Request):
                 print(f"Confirmation email sent to {body.get('email', '')}")
             except Exception as e:
                 print(f"Error sending confirmation email: {e}")
-        
+
+            # Notify admin
+            try:
+                resend.Emails.send({
+                    "from": "dev@printssistant.com",
+                    "to": "ben.martinec@gmail.com",
+                    "subject": f"💡 New idea: {body.get('title', '')}",
+                    "html": f"""
+                    <p><strong>From:</strong> {body.get('name', 'Anonymous')} ({body.get('email', '')})</p>
+                    <p><strong>Title:</strong> {body.get('title', '')}</p>
+                    <p><strong>Frequency:</strong> {body.get('impact', '')}</p>
+                    <p><strong>Description:</strong><br>{body.get('description', '')}</p>
+                    """,
+                })
+            except Exception as e:
+                print(f"Error sending admin notification: {e}")
+
         return {
             "message": "Thank you! Your idea has been submitted.",
             "title": body.get("title", "")
@@ -313,6 +329,21 @@ async def suggest_idea(request: Request, current_user: Optional[dict] = Depends(
         except Exception as e:
             print(f"Error storing idea: {e}")
             print(f"💡 Quick idea received: {idea[:100]} from {email}")
+
+        if resend_available and os.environ.get("RESEND_API_KEY"):
+            try:
+                resend.api_key = os.environ.get("RESEND_API_KEY")
+                resend.Emails.send({
+                    "from": "dev@printssistant.com",
+                    "to": "ben.martinec@gmail.com",
+                    "subject": "💡 New quick idea submitted",
+                    "html": f"""
+                    <p><strong>From:</strong> {email}</p>
+                    <p><strong>Idea:</strong><br>{idea}</p>
+                    """,
+                })
+            except Exception as e:
+                print(f"Error sending admin notification: {e}")
 
         return {"status": "success", "message": "Thanks! Your idea has been submitted."}
 
