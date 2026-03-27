@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Printssistant | Professional Printing Utilities</title>
-    <link rel="stylesheet" href="static/style.css" />
+    <link rel="stylesheet" href="./style.css" />
     <style>
       .user-type-btn {
         flex: 1;
@@ -41,9 +41,12 @@
     <!-- Navigation Menu -->
     <nav class="navbar">
       <div class="nav-container">
+        <button id="nav-hamburger" class="nav-hamburger" aria-label="Open menu">
+          <span></span><span></span><span></span>
+        </button>
         <div class="nav-links">
           <a href="/" class="nav-link">Home</a>
-          <a href="/preflight" class="nav-link">DG Preflight</a>
+          <a href="/preflight" class="nav-link">Preflight</a>
           <a href="/suggest-idea" class="nav-link">Suggest an Idea</a>
         </div>
         <div style="display:flex; align-items:center; gap:0.75rem;">
@@ -309,8 +312,7 @@
       </footer>
     </main>
 
-    <script src="static/script.js"></script>
-    <script src="static/suggest-modal.js"></script>
+    <script type="module" src="./script.js"></script>
 
     <script>
       function adjustForNavbar() {
@@ -329,5 +331,6 @@
       }
       window.addEventListener('resize', adjustForNavbar);
     </script>
+  <script type="module" src="./nav.js"></script>
   </body>
 </html>

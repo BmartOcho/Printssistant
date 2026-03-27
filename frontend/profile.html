@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Profile | Printssistant</title>
-    <link rel="stylesheet" href="/static/style.css" />
+    <link rel="stylesheet" href="./style.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet" />
@@ -184,9 +184,12 @@
 
     <nav class="navbar">
       <div class="nav-container">
+        <button id="nav-hamburger" class="nav-hamburger" aria-label="Open menu">
+          <span></span><span></span><span></span>
+        </button>
         <div class="nav-links">
           <a href="/" class="nav-link">Home</a>
-          <a href="/preflight" class="nav-link">DG Preflight</a>
+          <a href="/preflight" class="nav-link">Preflight</a>
           <a href="/suggest-idea" class="nav-link">Suggest an Idea</a>
         </div>
         <div style="display:flex; align-items:center; gap:0.75rem;">
@@ -445,6 +448,6 @@
 
     init();
     </script>
-  <script src="/static/suggest-modal.js"></script>
+  <script type="module" src="./nav.js"></script>
   </body>
 </html>

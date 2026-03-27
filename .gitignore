@@ -23,3 +23,7 @@ _Test Files/
 .env
 .env.local
 .env*.local
+
+# Node / Vite
+node_modules/
+static/
