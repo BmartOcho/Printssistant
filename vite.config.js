@@ -3,6 +3,7 @@ import { resolve } from 'path'
 
 export default defineConfig({
   root: 'frontend',
+  base: '/static/',
   build: {
     outDir: '../static',
     emptyOutDir: true,
