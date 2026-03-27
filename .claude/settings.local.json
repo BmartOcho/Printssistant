@@ -5,7 +5,14 @@
       "Bash(grep -E '\\\\.\\(py|txt|json|html|css|js|md\\)$')",
       "Bash(\"C:\\\\Users\\\\Benjamin\\\\Desktop\\\\Python Apps\\\\printssistant\\\\static\\\\style.css\")",
       "Skill(commit-commands:commit)",
-      "Skill(commit-commands:commit:*)"
+      "Skill(commit-commands:commit:*)",
+      "Bash(grep:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Skill(update-config)",
+      "mcp__claude_ai_Supabase__list_projects",
+      "mcp__claude_ai_Supabase__list_tables"
     ]
   }
 }
