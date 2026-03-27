@@ -94,12 +94,12 @@ async def add_cache_control(request: Request, call_next):
     # Cache images and fonts for 1 year (truly static assets)
     if path.startswith("/static/") and any(path.endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".gif", ".svg", ".woff", ".woff2", ".ttf"]):
         response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-    # Cache CSS and JS for 1 hour with revalidation — allows updates to propagate without busting cache
+    # CSS and JS: always revalidate — ensures users get updated scripts/styles after each deploy
     elif path.startswith("/static/") and any(path.endswith(ext) for ext in [".css", ".js"]):
-        response.headers["Cache-Control"] = "public, max-age=3600, must-revalidate"
-    # Cache HTML for 1 hour with revalidation
+        response.headers["Cache-Control"] = "no-cache"
+    # HTML pages: always revalidate — ensures the correct script tags are loaded
     elif path.endswith(".html") or path == "/":
-        response.headers["Cache-Control"] = "public, max-age=3600, must-revalidate"
+        response.headers["Cache-Control"] = "no-cache"
 
     return response
 
