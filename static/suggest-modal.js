@@ -110,14 +110,4 @@ function showSuggestIdeaModal() {
   });
 }
 
-// Wire up nav link on every page that includes this script
-document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('a.nav-link').forEach(link => {
-    if (link.getAttribute('href') === '/suggest-idea') {
-      link.addEventListener('click', (e) => {
-        e.preventDefault();
-        showSuggestIdeaModal();
-      });
-    }
-  });
-});
+// Nav link navigates normally to /suggest-idea (no interception needed)
