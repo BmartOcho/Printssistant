@@ -128,7 +128,7 @@ def get_preflight_job(job_id: str, retries: int = 3) -> dict | None:
     for attempt in range(retries):
         result = (
             supabase.table("preflight_jobs")
-            .select("id, user_id, filename, file_size, results, status, created_at, expires_at, page_count")
+            .select("id, user_id, filename, file_size, results, status, created_at, expires_at")
             .eq("id", job_id)
             .single()
             .execute()
