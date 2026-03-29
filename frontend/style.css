@@ -752,3 +752,196 @@ select.glass-input {
   font-size: 1.4rem;
   margin-bottom: 0.5rem;
 }
+
+/* ── Vectorizer Result ─────────────────────────────────────────────────── */
+.vec-preview-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.vec-preview-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.vec-preview-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.6;
+}
+
+.vec-preview-img {
+  width: 100%;
+  max-height: 360px;
+  object-fit: contain;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--glass-border);
+}
+
+.vec-stats-bar {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 0;
+  margin-bottom: 0.75rem;
+  border-top: 1px solid var(--glass-border);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.vec-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.vec-stat-val {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.vec-stat-lbl {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.55;
+}
+
+.vec-warnings {
+  background: rgba(253, 29, 29, 0.08);
+  border: 1px solid rgba(253, 29, 29, 0.2);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.vec-type-badge {
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  padding: 0.15rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.vec-tweak-panel {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+  text-align: left;
+}
+
+.vec-tweak-label {
+  font-size: 0.85rem;
+  opacity: 0.6;
+  margin-bottom: 0.75rem;
+}
+
+.vec-tweak-panel .input-group {
+  margin-bottom: 0.75rem;
+}
+
+.vec-actions {
+  text-align: center;
+}
+
+.vec-advanced-toggle {
+  background: transparent;
+  border: 1px solid var(--glass-border);
+  color: rgba(255, 255, 255, 0.7);
+  padding: 0.4rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: "Outfit", sans-serif;
+  margin-top: 0.75rem;
+}
+
+.vec-advanced-toggle:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: white;
+}
+
+.vec-advanced-panel {
+  margin-top: 1rem;
+}
+
+.vec-slider-group {
+  margin-bottom: 1rem;
+}
+
+.vec-slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.25rem;
+}
+
+.vec-slider-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.vec-slider-value {
+  font-size: 0.8rem;
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+
+.vec-slider-desc {
+  font-size: 0.72rem;
+  opacity: 0.45;
+  margin-bottom: 0.35rem;
+}
+
+.vec-slider-input {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  outline: none;
+}
+
+.vec-slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--primary-light);
+  cursor: pointer;
+  border: 2px solid white;
+}
+
+.vec-slider-input::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--primary-light);
+  cursor: pointer;
+  border: 2px solid white;
+}
+
+@media (max-width: 500px) {
+  .vec-preview-row {
+    flex-direction: column;
+  }
+  .vec-stats-bar {
+    gap: 1rem;
+  }
+}

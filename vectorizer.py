@@ -122,7 +122,10 @@ class VectorizerEngine:
 
             current_stage = "svg_validation"
 
-            # 4. Extract stats from SVG
+            # 4. Optimize SVG output
+            svg_content = self._optimize_svg(svg_content)
+
+            # 5. Extract stats from SVG
             stats = self._extract_stats(svg_content)
 
             # 5. Generate warnings and recommendations
@@ -196,17 +199,129 @@ class VectorizerEngine:
             return error_response
 
     # ═══════════════════════════════════════════════════════════════════
+    #  Auto Vectorize (smart pipeline — no presets needed)
+    # ═══════════════════════════════════════════════════════════════════
+
+    def auto_vectorize(self, image_bytes):
+        """
+        Smart auto-vectorization: classify image, enhance, select params, trace.
+        No preset or overrides needed — the system figures it out.
+
+        Returns same dict schema as vectorize() plus auto_classification in stats.
+        """
+        from auto_enhance import classify_image, auto_enhance, upscale_small, get_auto_config
+
+        start_time = time.time()
+
+        try:
+            # 1. Load image
+            img, has_alpha, content_is_light = self._load_image(image_bytes)
+            height, width = img.shape[:2]
+            original_w, original_h = width, height
+
+            # 2. Upscale small images
+            img = upscale_small(img)
+            height, width = img.shape[:2]
+
+            # 3. Classify
+            classification = classify_image(img, has_alpha)
+
+            # 4. Auto-enhance
+            img = auto_enhance(img, classification)
+            height, width = img.shape[:2]
+
+            # 5. Downscale if still too large
+            longest = max(width, height)
+            if longest > self.MAX_TRACE_DIM:
+                scale = self.MAX_TRACE_DIM / longest
+                new_w, new_h = int(width * scale), int(height * scale)
+                img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
+                width, height = new_w, new_h
+
+            # 6. Encode to PNG for engines
+            pil_img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+            buf = io.BytesIO()
+            pil_img.save(buf, format="PNG")
+            png_bytes = buf.getvalue()
+
+            # 7. Get auto config
+            config = get_auto_config(classification, width, height, has_alpha)
+
+            # 8. Route to engine
+            svg_content = None
+            engine_name = None
+
+            if config.get("use_potrace") and HAS_POTRACE:
+                try:
+                    svg_content = self._run_potrace(png_bytes, config, width, height)
+                    engine_name = "potrace"
+                except Exception as e:
+                    logger.warning(f"Potrace failed in auto mode: {e}, falling back to VTracer")
+
+            if svg_content is None:
+                svg_content = self._run_vtracer(png_bytes, config)
+                engine_name = "vtracer"
+
+            if not svg_content or not self._is_valid_svg(svg_content):
+                raise RuntimeError("Auto-vectorization produced invalid SVG output.")
+
+            # 9. Optimize, stats, preview
+            svg_content = self._optimize_svg(svg_content)
+            stats = self._extract_stats(svg_content)
+            preview = self._generate_preview(svg_content, png_bytes)
+
+            elapsed = time.time() - start_time
+            stats.update({
+                "processing_time": round(elapsed, 2),
+                "image_width": original_w,
+                "image_height": original_h,
+                "trace_width": width,
+                "trace_height": height,
+                "engine": engine_name,
+                "has_transparency": has_alpha,
+                "mode": config.get("mode", "bw"),
+                "auto_mode": True,
+                "auto_classification": classification,
+            })
+
+            return {"svg": svg_content, "preview_bw": preview, "stats": stats}
+
+        except Exception as e:
+            logger.error(f"Auto-vectorization failed: {str(e)}", exc_info=True)
+            return {
+                "svg": None,
+                "preview_bw": None,
+                "stats": {"error": str(e), "auto_mode": True},
+            }
+
+    # ═══════════════════════════════════════════════════════════════════
     #  Image Preparation
     # ═══════════════════════════════════════════════════════════════════
 
+    # Maximum pixel dimension before auto-downscale
+    MAX_TRACE_DIM = 3000
+
     def _prepare_image(self, image_bytes, config):
-        """Load image, handle alpha compositing, return PNG bytes for engines.
+        """Load image, handle alpha compositing, downscale, preprocess, return PNG bytes.
 
         Returns:
             (png_bytes, has_alpha, content_is_light, width, height)
         """
         img, has_alpha, content_is_light = self._load_image(image_bytes)
         height, width = img.shape[:2]
+
+        # Auto-downscale oversized images to prevent timeout
+        longest = max(width, height)
+        if longest > self.MAX_TRACE_DIM:
+            scale = self.MAX_TRACE_DIM / longest
+            new_w = int(width * scale)
+            new_h = int(height * scale)
+            img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
+            logger.info(f"Downscaled {width}x{height} -> {new_w}x{new_h} for tracing")
+            width, height = new_w, new_h
+
+        # Apply preprocessing pipeline
+        img = self._preprocess_image(img, config)
 
         # Re-encode composited image to PNG bytes for engine consumption
         pil_img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
@@ -257,6 +372,29 @@ class VectorizerEngine:
                 img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
 
         return img, has_alpha, content_is_light
+
+    def _preprocess_image(self, img, config):
+        """Apply optional preprocessing: contrast enhancement, denoising, sharpening."""
+        preprocess = config.get("preprocessing", {})
+        mode = config.get("mode", "bw")
+
+        # Bilateral filter for color mode — smooths noise while preserving edges
+        if mode == "color" and preprocess.get("bilateral", True):
+            img = cv2.bilateralFilter(img, d=9, sigmaColor=75, sigmaSpace=75)
+
+        # CLAHE contrast enhancement for B&W modes
+        if mode == "bw" and preprocess.get("clahe", False):
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            enhanced = clahe.apply(gray)
+            img = cv2.cvtColor(enhanced, cv2.COLOR_GRAY2BGR)
+
+        # Unsharp mask sharpening
+        if preprocess.get("sharpen", False):
+            blurred = cv2.GaussianBlur(img, (0, 0), 3)
+            img = cv2.addWeighted(img, 1.5, blurred, -0.5, 0)
+
+        return img
 
     # ═══════════════════════════════════════════════════════════════════
     #  VTracer Engine (Primary)
@@ -407,6 +545,38 @@ class VectorizerEngine:
         msg += "4. If this persists, contact support with your image file."
 
         return msg
+
+    # Regex to match coordinate numbers with excessive decimal places
+    _COORD_RE = re.compile(r"(\d+\.\d{4,})")
+
+    def _optimize_svg(self, svg_string):
+        """Reduce SVG size: truncate coordinate precision, strip metadata."""
+        try:
+            root = ET.fromstring(svg_string)
+
+            # Remove metadata, title, desc elements
+            for tag in ("metadata", "title", "desc",
+                        "{http://www.w3.org/2000/svg}metadata",
+                        "{http://www.w3.org/2000/svg}title",
+                        "{http://www.w3.org/2000/svg}desc"):
+                for elem in root.findall(f".//{tag}"):
+                    parent = root.find(f".//{tag}/..")
+                    if parent is None:
+                        root.remove(elem)
+                    else:
+                        parent.remove(elem)
+
+            # Truncate excessive coordinate precision in path d attributes
+            for path in list(root.iter()):
+                d = path.get("d")
+                if d:
+                    d_opt = self._COORD_RE.sub(lambda m: f"{float(m.group(1)):.2f}", d)
+                    path.set("d", d_opt)
+
+            return ET.tostring(root, encoding="unicode", xml_declaration=True)
+        except Exception as e:
+            logger.warning(f"SVG optimization failed, returning original: {e}")
+            return svg_string
 
     # ═══════════════════════════════════════════════════════════════════
     #  Image Analysis & Diagnostics
@@ -654,6 +824,16 @@ class VectorizerEngine:
         buf = io.BytesIO()
         pil_img.save(buf, format="PNG", optimize=True)
         return base64.b64encode(buf.getvalue()).decode("utf-8")
+
+    # ═══════════════════════════════════════════════════════════════════
+    #  Format Conversion
+    # ═══════════════════════════════════════════════════════════════════
+
+    def convert_svg_to_pdf(self, svg_string):
+        """Convert SVG string to PDF bytes using cairosvg."""
+        if not HAS_CAIROSVG:
+            raise RuntimeError("PDF output requires cairosvg, which is not available.")
+        return cairosvg.svg2pdf(bytestring=svg_string.encode("utf-8"))
 
     # ═══════════════════════════════════════════════════════════════════
     #  Config
