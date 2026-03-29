@@ -15,6 +15,8 @@ const resetBtn = document.getElementById('reset-btn');
 const statusText = document.getElementById('status-text');
 
 const tabBtns = document.querySelectorAll('.tab-btn');
+const duplexerSettings = document.getElementById('tool-settings-duplexer');
+const groupSizeInput = document.getElementById('group-size-input');
 const insertSettings = document.getElementById('tool-settings-insert');
 const dropTitle = document.getElementById('drop-title');
 const dropDesc = document.getElementById('drop-desc');
@@ -355,6 +357,7 @@ tabBtns.forEach(btn => {
 });
 
 function hideAllPanels() {
+    duplexerSettings.classList.add('hidden');
     insertSettings.classList.add('hidden');
     evenoddSettings.classList.add('hidden');
     cropperSettings.classList.add('hidden');
@@ -373,6 +376,7 @@ function updateUIForTool() {
     fileInput.accept = ".pdf";
 
     if (currentTool === 'duplexer') {
+        duplexerSettings.classList.remove('hidden');
         dropZone.classList.remove('hidden');
         dropTitle.innerText = "Drag & Drop PDF";
         dropDesc.innerText = "Standard Duplexing (Front/Back)";
@@ -451,6 +455,7 @@ async function handleUpload(file) {
     }
 
     dropZone.classList.add('hidden');
+    duplexerSettings.classList.add('hidden');
     insertSettings.classList.add('hidden');
     cropperSettings.classList.add('hidden');
     vectorizerSettings.classList.add('hidden');
@@ -463,6 +468,7 @@ async function handleUpload(file) {
 
     if (currentTool === 'duplexer') {
         formData.append('file', file);
+        formData.append('group_size', groupSizeInput.value);
         endpoint = '/upload';
     } else if (currentTool === 'insertbetween') {
         formData.append('base_file', file);

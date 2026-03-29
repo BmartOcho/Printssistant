@@ -12,17 +12,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-def make_duplex(input_path: Path, output_path: Path) -> bool:
+def make_duplex(input_path: Path, output_path: Path, group_size: int = 1) -> bool:
     """
-    Creates a duplex version of a PDF by duplicating each page.
+    Creates a duplex version of a PDF by duplicating groups of pages.
+    group_size=1: 1,1,2,2,3,3,...
+    group_size=3: 1-2-3,1-2-3,4-5-6,4-5-6,...
     """
     try:
         reader = PdfReader(str(input_path))
         writer = PdfWriter()
-        
-        for page in reader.pages:
-            writer.add_page(page)    # Front
-            writer.add_page(page)    # Back (duplicate)
+        pages = reader.pages
+
+        for i in range(0, len(pages), group_size):
+            group = pages[i:i + group_size]
+            for _ in range(2):          # Front pass + Back pass
+                for page in group:
+                    writer.add_page(page)
             
         with open(output_path, "wb") as f:
             writer.write(f)
