@@ -49,6 +49,11 @@ const vecSlidersContainer = document.getElementById('vec-sliders');
 const vecOutputFormat = document.getElementById('vec-output-format');
 let vecOriginalDataUrl = null;
 let vecParamsCache = {};
+let vecLastFile = null;
+const vecReprocessBtn = document.getElementById('vec-reprocess');
+const vecTweakPreset = document.getElementById('vec-tweak-preset');
+const vecTweakFormat = document.getElementById('vec-tweak-format');
+const vecTweakSliders = document.getElementById('vec-tweak-sliders');
 
 const insertFileZone = document.getElementById('insert-file-zone');
 const insertFileInput = document.getElementById('insert-file-input');
@@ -123,9 +128,10 @@ vecAdvancedToggle.addEventListener('click', () => {
         ? 'Advanced Settings' : 'Hide Advanced';
 });
 
-async function loadVecParams(presetKey) {
+async function loadVecParams(presetKey, container) {
+    container = container || vecSlidersContainer;
     if (vecParamsCache[presetKey]) {
-        renderVecSliders(vecParamsCache[presetKey]);
+        renderVecSliders(vecParamsCache[presetKey], container);
         return;
     }
     try {
@@ -133,31 +139,31 @@ async function loadVecParams(presetKey) {
         if (res.ok) {
             const params = await res.json();
             vecParamsCache[presetKey] = params;
-            renderVecSliders(params);
+            renderVecSliders(params, container);
         }
     } catch (e) { /* silent — sliders won't show */ }
 }
 
-function renderVecSliders(params) {
-    vecSlidersContainer.innerHTML = '';
+function renderVecSliders(params, container) {
+    container = container || vecSlidersContainer;
+    container.innerHTML = '';
     for (const [key, meta] of Object.entries(params)) {
-        const defaultVal = meta.step % 1 === 0 ? meta.min : meta.min.toFixed(1);
         const group = document.createElement('div');
         group.className = 'vec-slider-group';
         group.innerHTML = `
             <div class="vec-slider-header">
                 <span class="vec-slider-label">${meta.label}</span>
-                <span class="vec-slider-value" id="vec-val-${key}">default</span>
+                <span class="vec-slider-value">default</span>
             </div>
             <div class="vec-slider-desc">${meta.description}</div>
-            <input type="range" class="vec-slider-input" id="vec-param-${key}"
+            <input type="range" class="vec-slider-input"
                    min="${meta.min}" max="${meta.max}" step="${meta.step}"
                    data-key="${key}" data-default="true" />
         `;
-        vecSlidersContainer.appendChild(group);
+        container.appendChild(group);
 
-        const slider = group.querySelector(`#vec-param-${key}`);
-        const valSpan = group.querySelector(`#vec-val-${key}`);
+        const slider = group.querySelector('.vec-slider-input');
+        const valSpan = group.querySelector('.vec-slider-value');
         slider.addEventListener('input', () => {
             slider.dataset.default = 'false';
             valSpan.textContent = slider.value;
@@ -165,9 +171,9 @@ function renderVecSliders(params) {
     }
 }
 
-function getVecOverrides() {
+function getVecOverridesFrom(container) {
     const overrides = {};
-    vecSlidersContainer.querySelectorAll('.vec-slider-input').forEach(slider => {
+    container.querySelectorAll('.vec-slider-input').forEach(slider => {
         if (slider.dataset.default === 'false') {
             overrides[slider.dataset.key] = parseFloat(slider.value);
         }
@@ -175,7 +181,27 @@ function getVecOverrides() {
     return Object.keys(overrides).length ? JSON.stringify(overrides) : '';
 }
 
-vectorizerPreset.addEventListener('change', () => loadVecParams(vectorizerPreset.value));
+let vecUseReprocessOverrides = false;
+
+function getVecOverrides() {
+    if (vecUseReprocessOverrides) {
+        return getVecOverridesFrom(vecTweakSliders);
+    }
+    return getVecOverridesFrom(vecSlidersContainer);
+}
+
+vectorizerPreset.addEventListener('change', () => loadVecParams(vectorizerPreset.value, vecSlidersContainer));
+vecTweakPreset.addEventListener('change', () => loadVecParams(vecTweakPreset.value, vecTweakSliders));
+
+// Re-process: re-submit stored file with tweaked settings
+vecReprocessBtn.addEventListener('click', () => {
+    if (!vecLastFile) return;
+    vectorizerPreset.value = vecTweakPreset.value;
+    vecOutputFormat.value = vecTweakFormat.value;
+    vecUseReprocessOverrides = true;
+    vecResult.classList.add('hidden');
+    handleUpload(vecLastFile);
+});
 
 // Tools that require login (free tier)
 const AUTH_REQUIRED_TOOLS = ['duplexer', 'insertbetween', 'cropper'];
@@ -577,13 +603,16 @@ async function handleUpload(file) {
         return;
     }
 
-    // Capture original image for vectorizer preview
+    // Capture original image for vectorizer preview and keep file for re-processing
     if (currentTool === 'vectorizer') {
-        vecOriginalDataUrl = await new Promise(resolve => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.readAsDataURL(file);
-        });
+        vecLastFile = file;
+        if (!vecOriginalDataUrl) {
+            vecOriginalDataUrl = await new Promise(resolve => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.readAsDataURL(file);
+            });
+        }
     }
 
     dropZone.classList.add('hidden');
@@ -690,6 +719,12 @@ async function handleUpload(file) {
                     } else {
                         vecWarnings.classList.add('hidden');
                     }
+
+                    // Populate tweak panel with current settings
+                    vecTweakPreset.value = vectorizerPreset.value;
+                    vecTweakFormat.value = vecOutputFormat.value;
+                    vecUseReprocessOverrides = false;
+                    loadVecParams(vecTweakPreset.value, vecTweakSliders);
 
                     vecResult.classList.remove('hidden');
                 } else {
@@ -880,6 +915,8 @@ function resetUI() {
     progressFill.style.width = '0%';
     fileInput.value = '';
     vecOriginalDataUrl = null;
+    vecLastFile = null;
+    vecUseReprocessOverrides = false;
 
     if (currentTool !== 'evenodd' && currentTool !== 'swatchset') {
         dropZone.classList.remove('hidden');

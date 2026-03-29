@@ -373,9 +373,28 @@
             <div class="vec-stat"><span class="vec-stat-val" id="vec-engine">-</span><span class="vec-stat-lbl">Engine</span></div>
           </div>
           <div id="vec-warnings" class="vec-warnings hidden"></div>
+          <div id="vec-tweak-panel" class="vec-tweak-panel">
+            <div class="input-group">
+              <label for="vec-tweak-preset">Preset</label>
+              <select id="vec-tweak-preset" class="glass-input">
+                <option value="laser_bw">Laser Engraving (B&W)</option>
+                <option value="full_color">Full Color</option>
+                <option value="high_precision_bw">High Precision B&W</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label for="vec-tweak-format">Output Format</label>
+              <select id="vec-tweak-format" class="glass-input">
+                <option value="svg">SVG (Scalable Vector)</option>
+                <option value="pdf">PDF (Vector)</option>
+              </select>
+            </div>
+            <div id="vec-tweak-sliders"></div>
+          </div>
           <div class="vec-actions">
+            <button id="vec-reprocess" class="btn-primary">Re-process</button>
             <a href="#" id="vec-download" class="btn-primary">Download SVG</a>
-            <button id="vec-reset" class="btn-secondary">Process Another</button>
+            <button id="vec-reset" class="btn-secondary">New Image</button>
           </div>
         </div>
 

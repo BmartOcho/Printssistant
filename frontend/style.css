@@ -825,6 +825,18 @@ select.glass-input {
   line-height: 1.5;
 }
 
+.vec-tweak-panel {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+  text-align: left;
+}
+
+.vec-tweak-panel .input-group {
+  margin-bottom: 0.75rem;
+}
+
 .vec-actions {
   text-align: center;
 }
