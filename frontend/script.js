@@ -62,11 +62,35 @@ const logoutBtn           = document.getElementById('logout-btn');
 const proCta              = document.getElementById('pro-cta');
 const navAuthBtn          = document.getElementById('nav-auth-btn');
 
+// Cropper label presets: value → { rows, cols, desc }
+const CROPPER_LABEL_PRESETS = {
+    label_10x3:   { rows: 10, cols: 3 },
+    label_10x2:   { rows: 10, cols: 2 },
+    label_7x2:    { rows: 7,  cols: 2 },
+    label_5x2:    { rows: 5,  cols: 2 },
+    label_3x2:    { rows: 3,  cols: 2 },
+    label_20x4:   { rows: 20, cols: 4 },
+    label_2x2:    { rows: 2,  cols: 2 },
+    label_15x4:   { rows: 15, cols: 4 },
+    label_15x3:   { rows: 15, cols: 3 },
+    label_5x2_bc: { rows: 5,  cols: 2 },
+    label_3x2_nb: { rows: 3,  cols: 2 },
+    label_4x2:    { rows: 4,  cols: 2 },
+};
+
 // Cropper preset toggle
 cropperMode.addEventListener('change', () => {
-    if (cropperMode.value === 'reader_spreads') {
+    const val = cropperMode.value;
+    const preset = CROPPER_LABEL_PRESETS[val];
+
+    if (val === 'reader_spreads') {
         cropperGridOptions.classList.add('hidden');
         cropperModeDesc.innerText = 'First and last pages kept whole; middle pages split into left/right halves.';
+    } else if (preset) {
+        cropperRows.value = preset.rows;
+        cropperCols.value = preset.cols;
+        cropperGridOptions.classList.add('hidden');
+        cropperModeDesc.innerText = `${preset.rows} rows × ${preset.cols} columns — ${preset.rows * preset.cols} labels per sheet.`;
     } else {
         cropperGridOptions.classList.remove('hidden');
         cropperModeDesc.innerText = 'Specify how many rows and columns to split each page into.';
@@ -494,7 +518,8 @@ async function handleUpload(file) {
         endpoint = '/insert';
     } else if (currentTool === 'cropper') {
         formData.append('file', file);
-        formData.append('mode', cropperMode.value);
+        const isLabel = CROPPER_LABEL_PRESETS[cropperMode.value];
+        formData.append('mode', isLabel ? 'grid' : cropperMode.value);
         formData.append('rows', cropperRows.value);
         formData.append('cols', cropperCols.value);
         endpoint = '/crop';
