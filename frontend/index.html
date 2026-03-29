@@ -159,14 +159,41 @@
         <!-- Auto-Cropper Settings -->
         <div id="tool-settings-cropper" class="settings-panel hidden">
           <h3>Crop Settings</h3>
-          <p class="settings-desc">Specify how many rows and columns to split each page into.</p>
           <div class="input-group" style="margin-bottom: 1rem">
-            <label for="cropper-rows">Rows</label>
-            <input type="number" id="cropper-rows" value="2" min="1" class="glass-input" />
+            <label for="cropper-mode">Preset</label>
+            <select id="cropper-mode" class="glass-input">
+              <option value="grid">Custom Grid</option>
+              <option value="reader_spreads">Reader Spreads</option>
+              <optgroup label="Address / Shipping Labels">
+                <option value="label_10x3">Avery 5160 — Address (10×3, 30/sheet)</option>
+                <option value="label_10x2">Avery 5161 — Address (10×2, 20/sheet)</option>
+                <option value="label_7x2">Avery 5162 — Address (7×2, 14/sheet)</option>
+                <option value="label_5x2">Avery 5163 — Shipping (5×2, 10/sheet)</option>
+                <option value="label_3x2">Avery 5164 — Shipping (3×2, 6/sheet)</option>
+                <option value="label_20x4">Avery 5167 — Return Address (20×4, 80/sheet)</option>
+                <option value="label_2x2">Avery 5168 — Shipping Lg (2×2, 4/sheet)</option>
+              </optgroup>
+              <optgroup label="Product / Small Labels">
+                <option value="label_15x4">Avery 5195 — Small Labels (15×4, 60/sheet)</option>
+                <option value="label_15x3">Avery 5366 — File Folder (15×3, 45/sheet)</option>
+              </optgroup>
+              <optgroup label="Business Cards / Name Badges">
+                <option value="label_5x2_bc">Avery 8371 — Business Cards (5×2, 10/sheet)</option>
+                <option value="label_3x2_nb">Avery 5395 — Name Badges (3×2, 6/sheet)</option>
+                <option value="label_4x2">Avery 5392 — Name Badges (4×2, 8/sheet)</option>
+              </optgroup>
+            </select>
           </div>
-          <div class="input-group">
-            <label for="cropper-cols">Columns</label>
-            <input type="number" id="cropper-cols" value="2" min="1" class="glass-input" />
+          <p id="cropper-mode-desc" class="settings-desc">Specify how many rows and columns to split each page into.</p>
+          <div id="cropper-grid-options">
+            <div class="input-group" style="margin-bottom: 1rem">
+              <label for="cropper-rows">Rows</label>
+              <input type="number" id="cropper-rows" value="2" min="1" class="glass-input" />
+            </div>
+            <div class="input-group">
+              <label for="cropper-cols">Columns</label>
+              <input type="number" id="cropper-cols" value="2" min="1" class="glass-input" />
+            </div>
           </div>
         </div>
 
