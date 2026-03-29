@@ -96,6 +96,35 @@ DEFAULT_HIGH_PRECISION_BW = {
     },
 }
 
+DEFAULT_GREYSCALE = {
+    "name": "Greyscale",
+    "description": "Convert to greyscale and vectorize with smooth grey tones. "
+                   "Good for photos and shaded artwork.",
+    "icon": "\u25a1",
+    "category": "Color",
+    "mode": "color",
+    "alpha_handling": {
+        "invert": False,
+    },
+    "preprocessing": {
+        "greyscale": True,
+        "bilateral": True,
+    },
+    "vtracer": {
+        "colormode": "color",
+        "hierarchical": "stacked",
+        "mode": "spline",
+        "filter_speckle": 4,
+        "color_precision": 6,
+        "layer_difference": 16,
+        "corner_threshold": 60,
+        "length_threshold": 4.0,
+        "max_iterations": 10,
+        "splice_threshold": 45,
+        "path_precision": 6,
+    },
+}
+
 
 # ─── Parameter Metadata (drives frontend sliders + server-side validation) ──
 
@@ -209,6 +238,7 @@ _PRESET_MAP = {
     "laser_bw": DEFAULT_LASER_BW,
     "full_color": DEFAULT_FULL_COLOR,
     "high_precision_bw": DEFAULT_HIGH_PRECISION_BW,
+    "greyscale": DEFAULT_GREYSCALE,
 }
 
 
