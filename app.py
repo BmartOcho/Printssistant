@@ -969,6 +969,7 @@ async def stripe_webhook(request: Request):
 async def upload_pdf(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
+    group_size: int = Form(1),
     user: dict = Depends(check_free_limit),
 ):
     import time
@@ -990,7 +991,7 @@ async def upload_pdf(
 
     # Run CPU-intensive duplexer in thread pool to avoid blocking event loop
     start_time = time.time()
-    success = await asyncio.to_thread(make_duplex, file_path, output_path)
+    success = await asyncio.to_thread(make_duplex, file_path, output_path, max(1, group_size))
     processing_ms = int((time.time() - start_time) * 1000)
 
     if success:
