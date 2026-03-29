@@ -825,12 +825,27 @@ select.glass-input {
   line-height: 1.5;
 }
 
+.vec-type-badge {
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  padding: 0.15rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
 .vec-tweak-panel {
   background: rgba(0, 0, 0, 0.2);
   border-radius: 12px;
   padding: 1rem 1.25rem;
   margin-bottom: 1rem;
   text-align: left;
+}
+
+.vec-tweak-label {
+  font-size: 0.85rem;
+  opacity: 0.6;
+  margin-bottom: 0.75rem;
 }
 
 .vec-tweak-panel .input-group {

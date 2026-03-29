@@ -1132,6 +1132,61 @@ async def vectorizer_params(preset: str = "laser_bw"):
     return get_parameter_metadata(preset)
 
 
+@app.post("/vectorize-auto")
+async def vectorize_auto(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    output_format: str = Form("svg"),
+    user: dict = Depends(require_pro),
+):
+    """Smart auto-vectorization — no preset needed."""
+    import time as _time
+
+    image_bytes = await file.read()
+    file_size = len(image_bytes)
+    if file_size > MAX_IMAGE_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Image file too large. Maximum size is {MAX_IMAGE_SIZE // (1024*1024)} MB."
+        )
+
+    try:
+        start_time = _time.time()
+        result = await asyncio.to_thread(vectorizer_engine.auto_vectorize, image_bytes)
+        processing_ms = int((_time.time() - start_time) * 1000)
+
+        if result.get("svg") is None:
+            return {"status": "error", "message": result.get("stats", {}).get("error", "Vectorization failed")}
+
+        timestamp = int(_time.time())
+        basename = os.path.splitext(Path(file.filename).name)[0]
+        fmt = output_format.lower() if output_format in ("svg", "pdf") else "svg"
+
+        if fmt == "pdf":
+            pdf_bytes = await asyncio.to_thread(vectorizer_engine.convert_svg_to_pdf, result["svg"])
+            out_filename = f"{basename}_auto_{timestamp}.pdf"
+            out_path = PROCESSED_DIR / out_filename
+            with open(out_path, "wb") as f:
+                f.write(pdf_bytes)
+        else:
+            out_filename = f"{basename}_auto_{timestamp}.svg"
+            out_path = PROCESSED_DIR / out_filename
+            with open(out_path, "w", encoding="utf-8") as f:
+                f.write(result["svg"])
+
+        background_tasks.add_task(log_job_history, user["id"], "vectorizer", file_size, processing_ms)
+        background_tasks.add_task(cleanup_files_later, DOWNLOAD_RETENTION_SECONDS, out_path)
+
+        return {
+            "status": "success",
+            "filename": out_filename,
+            "preview_bw": result.get("preview_bw"),
+            "stats": result.get("stats"),
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
 @app.post("/vectorize")
 async def vectorize_image(
     background_tasks: BackgroundTasks,

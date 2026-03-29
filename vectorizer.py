@@ -199,6 +199,102 @@ class VectorizerEngine:
             return error_response
 
     # ═══════════════════════════════════════════════════════════════════
+    #  Auto Vectorize (smart pipeline — no presets needed)
+    # ═══════════════════════════════════════════════════════════════════
+
+    def auto_vectorize(self, image_bytes):
+        """
+        Smart auto-vectorization: classify image, enhance, select params, trace.
+        No preset or overrides needed — the system figures it out.
+
+        Returns same dict schema as vectorize() plus auto_classification in stats.
+        """
+        from auto_enhance import classify_image, auto_enhance, upscale_small, get_auto_config
+
+        start_time = time.time()
+
+        try:
+            # 1. Load image
+            img, has_alpha, content_is_light = self._load_image(image_bytes)
+            height, width = img.shape[:2]
+            original_w, original_h = width, height
+
+            # 2. Upscale small images
+            img = upscale_small(img)
+            height, width = img.shape[:2]
+
+            # 3. Classify
+            classification = classify_image(img, has_alpha)
+
+            # 4. Auto-enhance
+            img = auto_enhance(img, classification)
+            height, width = img.shape[:2]
+
+            # 5. Downscale if still too large
+            longest = max(width, height)
+            if longest > self.MAX_TRACE_DIM:
+                scale = self.MAX_TRACE_DIM / longest
+                new_w, new_h = int(width * scale), int(height * scale)
+                img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
+                width, height = new_w, new_h
+
+            # 6. Encode to PNG for engines
+            pil_img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+            buf = io.BytesIO()
+            pil_img.save(buf, format="PNG")
+            png_bytes = buf.getvalue()
+
+            # 7. Get auto config
+            config = get_auto_config(classification, width, height, has_alpha)
+
+            # 8. Route to engine
+            svg_content = None
+            engine_name = None
+
+            if config.get("use_potrace") and HAS_POTRACE:
+                try:
+                    svg_content = self._run_potrace(png_bytes, config, width, height)
+                    engine_name = "potrace"
+                except Exception as e:
+                    logger.warning(f"Potrace failed in auto mode: {e}, falling back to VTracer")
+
+            if svg_content is None:
+                svg_content = self._run_vtracer(png_bytes, config)
+                engine_name = "vtracer"
+
+            if not svg_content or not self._is_valid_svg(svg_content):
+                raise RuntimeError("Auto-vectorization produced invalid SVG output.")
+
+            # 9. Optimize, stats, preview
+            svg_content = self._optimize_svg(svg_content)
+            stats = self._extract_stats(svg_content)
+            preview = self._generate_preview(svg_content, png_bytes)
+
+            elapsed = time.time() - start_time
+            stats.update({
+                "processing_time": round(elapsed, 2),
+                "image_width": original_w,
+                "image_height": original_h,
+                "trace_width": width,
+                "trace_height": height,
+                "engine": engine_name,
+                "has_transparency": has_alpha,
+                "mode": config.get("mode", "bw"),
+                "auto_mode": True,
+                "auto_classification": classification,
+            })
+
+            return {"svg": svg_content, "preview_bw": preview, "stats": stats}
+
+        except Exception as e:
+            logger.error(f"Auto-vectorization failed: {str(e)}", exc_info=True)
+            return {
+                "svg": None,
+                "preview_bw": None,
+                "stats": {"error": str(e), "auto_mode": True},
+            }
+
+    # ═══════════════════════════════════════════════════════════════════
     #  Image Preparation
     # ═══════════════════════════════════════════════════════════════════
 

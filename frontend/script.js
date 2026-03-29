@@ -29,12 +29,13 @@ const cropperRows = document.getElementById('cropper-rows');
 const cropperCols = document.getElementById('cropper-cols');
 
 const vectorizerSettings = document.getElementById('tool-settings-vectorizer');
-const vectorizerPreset = document.getElementById('vectorizer-preset');
+const vecOutputFormat = document.getElementById('vec-output-format');
 
 // Vectorizer result elements
 const vecResult = document.getElementById('vec-result');
 const vecOriginal = document.getElementById('vec-original');
 const vecOutput = document.getElementById('vec-output');
+const vecType = document.getElementById('vec-type');
 const vecPaths = document.getElementById('vec-paths');
 const vecPoints = document.getElementById('vec-points');
 const vecColors = document.getElementById('vec-colors');
@@ -43,17 +44,14 @@ const vecEngine = document.getElementById('vec-engine');
 const vecWarnings = document.getElementById('vec-warnings');
 const vecDownload = document.getElementById('vec-download');
 const vecResetBtn = document.getElementById('vec-reset');
-const vecAdvancedToggle = document.getElementById('vec-advanced-toggle');
-const vecAdvancedPanel = document.getElementById('vec-advanced-panel');
-const vecSlidersContainer = document.getElementById('vec-sliders');
-const vecOutputFormat = document.getElementById('vec-output-format');
-let vecOriginalDataUrl = null;
-let vecParamsCache = {};
-let vecLastFile = null;
 const vecReprocessBtn = document.getElementById('vec-reprocess');
 const vecTweakPreset = document.getElementById('vec-tweak-preset');
 const vecTweakFormat = document.getElementById('vec-tweak-format');
 const vecTweakSliders = document.getElementById('vec-tweak-sliders');
+let vecOriginalDataUrl = null;
+let vecParamsCache = {};
+let vecLastFile = null;
+let vecUseManualPreset = false;
 
 const insertFileZone = document.getElementById('insert-file-zone');
 const insertFileInput = document.getElementById('insert-file-input');
@@ -121,17 +119,10 @@ cropperMode.addEventListener('change', () => {
     }
 });
 
-// ── Vectorizer Advanced Settings ─────────────────────────────────────────────
-vecAdvancedToggle.addEventListener('click', () => {
-    vecAdvancedPanel.classList.toggle('hidden');
-    vecAdvancedToggle.textContent = vecAdvancedPanel.classList.contains('hidden')
-        ? 'Advanced Settings' : 'Hide Advanced';
-});
-
-async function loadVecParams(presetKey, container) {
-    container = container || vecSlidersContainer;
+// ── Vectorizer Tweak Panel (manual preset re-process) ────────────────────────
+async function loadVecParams(presetKey) {
     if (vecParamsCache[presetKey]) {
-        renderVecSliders(vecParamsCache[presetKey], container);
+        renderVecSliders(vecParamsCache[presetKey]);
         return;
     }
     try {
@@ -139,14 +130,13 @@ async function loadVecParams(presetKey, container) {
         if (res.ok) {
             const params = await res.json();
             vecParamsCache[presetKey] = params;
-            renderVecSliders(params, container);
+            renderVecSliders(params);
         }
-    } catch (e) { /* silent — sliders won't show */ }
+    } catch (e) { /* silent */ }
 }
 
-function renderVecSliders(params, container) {
-    container = container || vecSlidersContainer;
-    container.innerHTML = '';
+function renderVecSliders(params) {
+    vecTweakSliders.innerHTML = '';
     for (const [key, meta] of Object.entries(params)) {
         const group = document.createElement('div');
         group.className = 'vec-slider-group';
@@ -160,7 +150,7 @@ function renderVecSliders(params, container) {
                    min="${meta.min}" max="${meta.max}" step="${meta.step}"
                    data-key="${key}" data-default="true" />
         `;
-        container.appendChild(group);
+        vecTweakSliders.appendChild(group);
 
         const slider = group.querySelector('.vec-slider-input');
         const valSpan = group.querySelector('.vec-slider-value');
@@ -171,9 +161,9 @@ function renderVecSliders(params, container) {
     }
 }
 
-function getVecOverridesFrom(container) {
+function getVecOverrides() {
     const overrides = {};
-    container.querySelectorAll('.vec-slider-input').forEach(slider => {
+    vecTweakSliders.querySelectorAll('.vec-slider-input').forEach(slider => {
         if (slider.dataset.default === 'false') {
             overrides[slider.dataset.key] = parseFloat(slider.value);
         }
@@ -181,24 +171,12 @@ function getVecOverridesFrom(container) {
     return Object.keys(overrides).length ? JSON.stringify(overrides) : '';
 }
 
-let vecUseReprocessOverrides = false;
+vecTweakPreset.addEventListener('change', () => loadVecParams(vecTweakPreset.value));
 
-function getVecOverrides() {
-    if (vecUseReprocessOverrides) {
-        return getVecOverridesFrom(vecTweakSliders);
-    }
-    return getVecOverridesFrom(vecSlidersContainer);
-}
-
-vectorizerPreset.addEventListener('change', () => loadVecParams(vectorizerPreset.value, vecSlidersContainer));
-vecTweakPreset.addEventListener('change', () => loadVecParams(vecTweakPreset.value, vecTweakSliders));
-
-// Re-process: re-submit stored file with tweaked settings
+// Re-process with manual preset
 vecReprocessBtn.addEventListener('click', () => {
     if (!vecLastFile) return;
-    vectorizerPreset.value = vecTweakPreset.value;
-    vecOutputFormat.value = vecTweakFormat.value;
-    vecUseReprocessOverrides = true;
+    vecUseManualPreset = true;
     vecResult.classList.add('hidden');
     handleUpload(vecLastFile);
 });
@@ -544,7 +522,6 @@ function updateUIForTool() {
         dropTitle.innerText = "Drag & Drop Image";
         dropDesc.innerText = "Upload an image (PNG, JPG) to vectorize";
         fileInput.accept = ".png,.jpg,.jpeg";
-        loadVecParams(vectorizerPreset.value);
     } else if (currentTool === 'evenodd') {
         evenoddSettings.classList.remove('hidden');
     } else if (currentTool === 'swatchset') {
@@ -645,11 +622,17 @@ async function handleUpload(file) {
         endpoint = '/crop';
     } else if (currentTool === 'vectorizer') {
         formData.append('file', file);
-        formData.append('preset', vectorizerPreset.value);
-        formData.append('output_format', vecOutputFormat.value);
-        const ov = getVecOverrides();
-        if (ov) formData.append('overrides', ov);
-        endpoint = '/vectorize';
+        if (vecUseManualPreset) {
+            formData.append('preset', vecTweakPreset.value);
+            formData.append('output_format', vecTweakFormat.value);
+            const ov = getVecOverrides();
+            if (ov) formData.append('overrides', ov);
+            endpoint = '/vectorize';
+            vecUseManualPreset = false;
+        } else {
+            formData.append('output_format', vecOutputFormat.value);
+            endpoint = '/vectorize-auto';
+        }
     }
 
     // Use XMLHttpRequest for real upload progress tracking
@@ -705,6 +688,8 @@ async function handleUpload(file) {
                     vecDownload.textContent = `Download ${data.filename.endsWith('.pdf') ? 'PDF' : 'SVG'}`;
 
                     const s = data.stats || {};
+                    const autoClass = s.auto_classification || {};
+                    vecType.textContent = autoClass.type ? autoClass.type.charAt(0).toUpperCase() + autoClass.type.slice(1) : '-';
                     vecPaths.textContent = (s.path_count ?? '-').toLocaleString();
                     vecPoints.textContent = (s.point_count ?? '-').toLocaleString();
                     vecColors.textContent = s.color_count ?? '-';
@@ -720,11 +705,9 @@ async function handleUpload(file) {
                         vecWarnings.classList.add('hidden');
                     }
 
-                    // Populate tweak panel with current settings
-                    vecTweakPreset.value = vectorizerPreset.value;
+                    // Populate tweak panel for manual re-process
                     vecTweakFormat.value = vecOutputFormat.value;
-                    vecUseReprocessOverrides = false;
-                    loadVecParams(vecTweakPreset.value, vecTweakSliders);
+                    loadVecParams(vecTweakPreset.value);
 
                     vecResult.classList.remove('hidden');
                 } else {
@@ -916,7 +899,7 @@ function resetUI() {
     fileInput.value = '';
     vecOriginalDataUrl = null;
     vecLastFile = null;
-    vecUseReprocessOverrides = false;
+    vecUseManualPreset = false;
 
     if (currentTool !== 'evenodd' && currentTool !== 'swatchset') {
         dropZone.classList.remove('hidden');
