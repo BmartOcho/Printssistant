@@ -378,6 +378,11 @@ class VectorizerEngine:
         preprocess = config.get("preprocessing", {})
         mode = config.get("mode", "bw")
 
+        # Greyscale conversion (before other steps)
+        if preprocess.get("greyscale", False):
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            img = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+
         # Bilateral filter for color mode — smooths noise while preserving edges
         if mode == "color" and preprocess.get("bilateral", True):
             img = cv2.bilateralFilter(img, d=9, sigmaColor=75, sigmaSpace=75)

@@ -29,6 +29,7 @@ const cropperRows = document.getElementById('cropper-rows');
 const cropperCols = document.getElementById('cropper-cols');
 
 const vectorizerSettings = document.getElementById('tool-settings-vectorizer');
+const vecModeSelect = document.getElementById('vec-mode-select');
 const vecOutputFormat = document.getElementById('vec-output-format');
 
 // Vectorizer result elements
@@ -44,14 +45,7 @@ const vecEngine = document.getElementById('vec-engine');
 const vecWarnings = document.getElementById('vec-warnings');
 const vecDownload = document.getElementById('vec-download');
 const vecResetBtn = document.getElementById('vec-reset');
-const vecReprocessBtn = document.getElementById('vec-reprocess');
-const vecTweakPreset = document.getElementById('vec-tweak-preset');
-const vecTweakFormat = document.getElementById('vec-tweak-format');
-const vecTweakSliders = document.getElementById('vec-tweak-sliders');
 let vecOriginalDataUrl = null;
-let vecParamsCache = {};
-let vecLastFile = null;
-let vecUseManualPreset = false;
 
 const insertFileZone = document.getElementById('insert-file-zone');
 const insertFileInput = document.getElementById('insert-file-input');
@@ -119,67 +113,6 @@ cropperMode.addEventListener('change', () => {
     }
 });
 
-// ── Vectorizer Tweak Panel (manual preset re-process) ────────────────────────
-async function loadVecParams(presetKey) {
-    if (vecParamsCache[presetKey]) {
-        renderVecSliders(vecParamsCache[presetKey]);
-        return;
-    }
-    try {
-        const res = await fetch(`/vectorizer-params?preset=${presetKey}`);
-        if (res.ok) {
-            const params = await res.json();
-            vecParamsCache[presetKey] = params;
-            renderVecSliders(params);
-        }
-    } catch (e) { /* silent */ }
-}
-
-function renderVecSliders(params) {
-    vecTweakSliders.innerHTML = '';
-    for (const [key, meta] of Object.entries(params)) {
-        const group = document.createElement('div');
-        group.className = 'vec-slider-group';
-        group.innerHTML = `
-            <div class="vec-slider-header">
-                <span class="vec-slider-label">${meta.label}</span>
-                <span class="vec-slider-value">default</span>
-            </div>
-            <div class="vec-slider-desc">${meta.description}</div>
-            <input type="range" class="vec-slider-input"
-                   min="${meta.min}" max="${meta.max}" step="${meta.step}"
-                   data-key="${key}" data-default="true" />
-        `;
-        vecTweakSliders.appendChild(group);
-
-        const slider = group.querySelector('.vec-slider-input');
-        const valSpan = group.querySelector('.vec-slider-value');
-        slider.addEventListener('input', () => {
-            slider.dataset.default = 'false';
-            valSpan.textContent = slider.value;
-        });
-    }
-}
-
-function getVecOverrides() {
-    const overrides = {};
-    vecTweakSliders.querySelectorAll('.vec-slider-input').forEach(slider => {
-        if (slider.dataset.default === 'false') {
-            overrides[slider.dataset.key] = parseFloat(slider.value);
-        }
-    });
-    return Object.keys(overrides).length ? JSON.stringify(overrides) : '';
-}
-
-vecTweakPreset.addEventListener('change', () => loadVecParams(vecTweakPreset.value));
-
-// Re-process with manual preset
-vecReprocessBtn.addEventListener('click', () => {
-    if (!vecLastFile) return;
-    vecUseManualPreset = true;
-    vecResult.classList.add('hidden');
-    handleUpload(vecLastFile);
-});
 
 // Tools that require login (free tier)
 const AUTH_REQUIRED_TOOLS = ['duplexer', 'insertbetween', 'cropper'];
@@ -580,16 +513,13 @@ async function handleUpload(file) {
         return;
     }
 
-    // Capture original image for vectorizer preview and keep file for re-processing
-    if (currentTool === 'vectorizer') {
-        vecLastFile = file;
-        if (!vecOriginalDataUrl) {
-            vecOriginalDataUrl = await new Promise(resolve => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result);
-                reader.readAsDataURL(file);
-            });
-        }
+    // Capture original image for vectorizer preview
+    if (currentTool === 'vectorizer' && !vecOriginalDataUrl) {
+        vecOriginalDataUrl = await new Promise(resolve => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.readAsDataURL(file);
+        });
     }
 
     dropZone.classList.add('hidden');
@@ -622,16 +552,13 @@ async function handleUpload(file) {
         endpoint = '/crop';
     } else if (currentTool === 'vectorizer') {
         formData.append('file', file);
-        if (vecUseManualPreset) {
-            formData.append('preset', vecTweakPreset.value);
-            formData.append('output_format', vecTweakFormat.value);
-            const ov = getVecOverrides();
-            if (ov) formData.append('overrides', ov);
-            endpoint = '/vectorize';
-            vecUseManualPreset = false;
-        } else {
-            formData.append('output_format', vecOutputFormat.value);
+        formData.append('output_format', vecOutputFormat.value);
+        const mode = vecModeSelect.value;
+        if (mode === 'auto') {
             endpoint = '/vectorize-auto';
+        } else {
+            formData.append('preset', mode);
+            endpoint = '/vectorize';
         }
     }
 
@@ -689,7 +616,10 @@ async function handleUpload(file) {
 
                     const s = data.stats || {};
                     const autoClass = s.auto_classification || {};
-                    vecType.textContent = autoClass.type ? autoClass.type.charAt(0).toUpperCase() + autoClass.type.slice(1) : '-';
+                    const modeLabelMap = { laser_bw: 'Laser B&W', full_color: 'Full Color', greyscale: 'Greyscale' };
+                    vecType.textContent = autoClass.type
+                        ? autoClass.type.charAt(0).toUpperCase() + autoClass.type.slice(1)
+                        : (modeLabelMap[vecModeSelect.value] || '-');
                     vecPaths.textContent = (s.path_count ?? '-').toLocaleString();
                     vecPoints.textContent = (s.point_count ?? '-').toLocaleString();
                     vecColors.textContent = s.color_count ?? '-';
@@ -704,10 +634,6 @@ async function handleUpload(file) {
                     } else {
                         vecWarnings.classList.add('hidden');
                     }
-
-                    // Populate tweak panel for manual re-process
-                    vecTweakFormat.value = vecOutputFormat.value;
-                    loadVecParams(vecTweakPreset.value);
 
                     vecResult.classList.remove('hidden');
                 } else {
@@ -898,8 +824,6 @@ function resetUI() {
     progressFill.style.width = '0%';
     fileInput.value = '';
     vecOriginalDataUrl = null;
-    vecLastFile = null;
-    vecUseManualPreset = false;
 
     if (currentTool !== 'evenodd' && currentTool !== 'swatchset') {
         dropZone.classList.remove('hidden');
