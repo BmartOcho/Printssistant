@@ -85,6 +85,7 @@ async function initApp() {
     if (!token) {
         // Not logged in — that's fine, let them browse
         updateUIForAuthState();
+        updateUIForTool();
         maybeOpenSignInFromParam();
         return;
     }
@@ -93,6 +94,7 @@ async function initApp() {
         if (!me.ok) {
             localStorage.removeItem(TOKEN_KEY);
             updateUIForAuthState();
+            updateUIForTool();
             maybeOpenSignInFromParam();
             return;
         }
@@ -103,6 +105,7 @@ async function initApp() {
         updateUIForAuthState();
         maybeOpenSignInFromParam();
     }
+    updateUIForTool();
 }
 
 function maybeOpenSignInFromParam() {
