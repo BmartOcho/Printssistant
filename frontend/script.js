@@ -20,6 +20,9 @@ const dropTitle = document.getElementById('drop-title');
 const dropDesc = document.getElementById('drop-desc');
 
 const cropperSettings = document.getElementById('tool-settings-cropper');
+const cropperMode = document.getElementById('cropper-mode');
+const cropperModeDesc = document.getElementById('cropper-mode-desc');
+const cropperGridOptions = document.getElementById('cropper-grid-options');
 const cropperRows = document.getElementById('cropper-rows');
 const cropperCols = document.getElementById('cropper-cols');
 
@@ -56,6 +59,17 @@ const userInfoText        = document.getElementById('user-info-text');
 const logoutBtn           = document.getElementById('logout-btn');
 const proCta              = document.getElementById('pro-cta');
 const navAuthBtn          = document.getElementById('nav-auth-btn');
+
+// Cropper preset toggle
+cropperMode.addEventListener('change', () => {
+    if (cropperMode.value === 'reader_spreads') {
+        cropperGridOptions.classList.add('hidden');
+        cropperModeDesc.innerText = 'First and last pages kept whole; middle pages split into left/right halves.';
+    } else {
+        cropperGridOptions.classList.remove('hidden');
+        cropperModeDesc.innerText = 'Specify how many rows and columns to split each page into.';
+    }
+});
 
 // Tools that require login (free tier)
 const AUTH_REQUIRED_TOOLS = ['duplexer', 'insertbetween', 'cropper'];
@@ -471,6 +485,7 @@ async function handleUpload(file) {
         endpoint = '/insert';
     } else if (currentTool === 'cropper') {
         formData.append('file', file);
+        formData.append('mode', cropperMode.value);
         formData.append('rows', cropperRows.value);
         formData.append('cols', cropperCols.value);
         endpoint = '/crop';

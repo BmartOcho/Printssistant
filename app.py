@@ -14,7 +14,6 @@ except ImportError:
 
 import asyncio
 import shutil
-import zipfile
 import secrets
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -26,7 +25,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from duplexer import make_duplex
-from cropper_logic import process_auto_crop
+from cropper_logic import process_auto_crop, process_reader_spreads
 from insert_logic import insert_pages
 from even_odd_logic import generate_even_odd
 from vectorizer import engine as vectorizer_engine
@@ -1012,8 +1011,9 @@ async def upload_pdf(
 async def crop_pdf(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    rows: int = Form(..., ge=1, le=100),
-    cols: int = Form(..., ge=1, le=100),
+    mode: str = Form("grid"),
+    rows: int = Form(2, ge=1, le=100),
+    cols: int = Form(2, ge=1, le=100),
     user: dict = Depends(check_free_limit),
 ):
     import time
@@ -1031,39 +1031,23 @@ async def crop_pdf(
         buffer.write(file_content)
 
     start_time = time.time()
-    cropped_files = await asyncio.to_thread(process_auto_crop, file_path, PROCESSED_DIR, rows, cols)
+    if mode == "reader_spreads":
+        output_filename = await asyncio.to_thread(process_reader_spreads, file_path, PROCESSED_DIR)
+    else:
+        output_filename = await asyncio.to_thread(process_auto_crop, file_path, PROCESSED_DIR, rows, cols)
     processing_ms = int((time.time() - start_time) * 1000)
 
-    if not cropped_files:
+    if not output_filename:
         background_tasks.add_task(cleanup_files, file_path)
         return JSONResponse(status_code=500, content={"status": "error", "message": "Crop produced no output"})
 
-    if len(cropped_files) > 1:
-        zip_filename = f"cropped_{safe_name}.zip"
-        zip_path = PROCESSED_DIR / zip_filename
-        with zipfile.ZipFile(zip_path, 'w') as zipf:
-            for f in cropped_files:
-                zipf.write(PROCESSED_DIR / f, arcname=f)
-        increment_job_count(user["id"])
-        # Log job history in background
-        background_tasks.add_task(log_job_history, user["id"], "cropper", file_size, processing_ms)
-        # Clean up original upload after response
-        background_tasks.add_task(cleanup_files, file_path)
-        # Keep processed files briefly so /download/{filename} can fetch them.
-        output_paths = [zip_path] + [PROCESSED_DIR / f for f in cropped_files]
-        background_tasks.add_task(cleanup_files_later, DOWNLOAD_RETENTION_SECONDS, *output_paths)
-        return {"status": "success", "filename": zip_filename}
-
     increment_job_count(user["id"])
-    # Log job history in background
     background_tasks.add_task(log_job_history, user["id"], "cropper", file_size, processing_ms)
-    # Clean up original upload after response
     background_tasks.add_task(cleanup_files, file_path)
-    # Keep processed file briefly so /download/{filename} can fetch it.
     background_tasks.add_task(
-        cleanup_files_later, DOWNLOAD_RETENTION_SECONDS, PROCESSED_DIR / cropped_files[0]
+        cleanup_files_later, DOWNLOAD_RETENTION_SECONDS, PROCESSED_DIR / output_filename
     )
-    return {"status": "success", "filename": cropped_files[0]}
+    return {"status": "success", "filename": output_filename}
 
 
 @app.post("/insert")

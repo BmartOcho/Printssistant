@@ -149,14 +149,23 @@
         <!-- Auto-Cropper Settings -->
         <div id="tool-settings-cropper" class="settings-panel hidden">
           <h3>Crop Settings</h3>
-          <p class="settings-desc">Specify how many rows and columns to split each page into.</p>
           <div class="input-group" style="margin-bottom: 1rem">
-            <label for="cropper-rows">Rows</label>
-            <input type="number" id="cropper-rows" value="2" min="1" class="glass-input" />
+            <label for="cropper-mode">Preset</label>
+            <select id="cropper-mode" class="glass-input">
+              <option value="grid">Custom Grid</option>
+              <option value="reader_spreads">Reader Spreads</option>
+            </select>
           </div>
-          <div class="input-group">
-            <label for="cropper-cols">Columns</label>
-            <input type="number" id="cropper-cols" value="2" min="1" class="glass-input" />
+          <p id="cropper-mode-desc" class="settings-desc">Specify how many rows and columns to split each page into.</p>
+          <div id="cropper-grid-options">
+            <div class="input-group" style="margin-bottom: 1rem">
+              <label for="cropper-rows">Rows</label>
+              <input type="number" id="cropper-rows" value="2" min="1" class="glass-input" />
+            </div>
+            <div class="input-group">
+              <label for="cropper-cols">Columns</label>
+              <input type="number" id="cropper-cols" value="2" min="1" class="glass-input" />
+            </div>
           </div>
         </div>
 
