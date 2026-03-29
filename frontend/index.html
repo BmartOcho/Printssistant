@@ -233,6 +233,17 @@
               <option value="high_precision_bw">High Precision B&W</option>
             </select>
           </div>
+          <div class="input-group" style="margin-top: 0.75rem">
+            <label for="vec-output-format">Output Format</label>
+            <select id="vec-output-format" class="glass-input">
+              <option value="svg">SVG (Scalable Vector)</option>
+              <option value="pdf">PDF (Vector)</option>
+            </select>
+          </div>
+          <button type="button" id="vec-advanced-toggle" class="vec-advanced-toggle">Advanced Settings</button>
+          <div id="vec-advanced-panel" class="vec-advanced-panel hidden">
+            <div id="vec-sliders"></div>
+          </div>
         </div>
 
         <!-- Swatch Set Creator Settings -->
@@ -340,6 +351,32 @@
           <h3>File Ready!</h3>
           <a href="#" id="download-link" class="btn-primary">Download Result</a>
           <button id="reset-btn" class="btn-secondary">Process Another</button>
+        </div>
+
+        <!-- Vectorizer Result (side-by-side preview + stats) -->
+        <div id="vec-result" class="hidden">
+          <div class="vec-preview-row">
+            <div class="vec-preview-col">
+              <span class="vec-preview-label">Original</span>
+              <img id="vec-original" class="vec-preview-img" alt="Original image" />
+            </div>
+            <div class="vec-preview-col">
+              <span class="vec-preview-label">Vectorized</span>
+              <img id="vec-output" class="vec-preview-img" alt="Vectorized output" />
+            </div>
+          </div>
+          <div class="vec-stats-bar">
+            <div class="vec-stat"><span class="vec-stat-val" id="vec-paths">-</span><span class="vec-stat-lbl">Paths</span></div>
+            <div class="vec-stat"><span class="vec-stat-val" id="vec-points">-</span><span class="vec-stat-lbl">Points</span></div>
+            <div class="vec-stat"><span class="vec-stat-val" id="vec-colors">-</span><span class="vec-stat-lbl">Colors</span></div>
+            <div class="vec-stat"><span class="vec-stat-val" id="vec-time">-</span><span class="vec-stat-lbl">Time</span></div>
+            <div class="vec-stat"><span class="vec-stat-val" id="vec-engine">-</span><span class="vec-stat-lbl">Engine</span></div>
+          </div>
+          <div id="vec-warnings" class="vec-warnings hidden"></div>
+          <div class="vec-actions">
+            <a href="#" id="vec-download" class="btn-primary">Download SVG</a>
+            <button id="vec-reset" class="btn-secondary">Process Another</button>
+          </div>
         </div>
 
       </section>

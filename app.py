@@ -29,7 +29,7 @@ from cropper_logic import process_auto_crop, process_reader_spreads
 from insert_logic import insert_pages
 from even_odd_logic import generate_even_odd
 from vectorizer import engine as vectorizer_engine
-from presets import get_preset
+from presets import get_preset, get_parameter_metadata, validate_overrides
 from swatchset_logic import generate_swatchset
 from auth import get_current_user, get_optional_user, require_pro, check_free_limit, create_access_token, security
 from db import (
@@ -1126,17 +1126,35 @@ async def get_even_odd(
 
 # ── Pro-Only Tools ────────────────────────────────────────────────────────────
 
+@app.get("/vectorizer-params")
+async def vectorizer_params(preset: str = "laser_bw"):
+    """Return tunable parameter metadata for the given preset."""
+    return get_parameter_metadata(preset)
+
+
 @app.post("/vectorize")
 async def vectorize_image(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     preset: str = Form("laser_bw"),
+    overrides: str = Form(""),
+    output_format: str = Form("svg"),
     user: dict = Depends(require_pro),
 ):
-    import time
+    import time, json as _json
     preset_config = get_preset(preset)
     if not preset_config:
         return {"status": "error", "message": f"Unknown preset: {preset}"}
+
+    # Parse and validate custom overrides
+    custom_overrides = None
+    if overrides and overrides.strip():
+        try:
+            raw = _json.loads(overrides)
+            if isinstance(raw, dict) and raw:
+                custom_overrides = validate_overrides(raw, preset)
+        except _json.JSONDecodeError:
+            pass
 
     image_bytes = await file.read()
     file_size = len(image_bytes)
@@ -1148,25 +1166,33 @@ async def vectorize_image(
 
     try:
         start_time = time.time()
-        result = await asyncio.to_thread(vectorizer_engine.vectorize, image_bytes, preset_config)
+        result = await asyncio.to_thread(vectorizer_engine.vectorize, image_bytes, preset_config, custom_overrides)
         processing_ms = int((time.time() - start_time) * 1000)
 
         timestamp = int(time.time())
         basename = os.path.splitext(Path(file.filename).name)[0]
-        svg_filename = f"{basename}_{preset}_{timestamp}.svg"
-        svg_path = PROCESSED_DIR / svg_filename
+        fmt = output_format.lower() if output_format in ("svg", "pdf") else "svg"
 
-        with open(svg_path, "w", encoding="utf-8") as f:
-            f.write(result["svg"])
+        if fmt == "pdf":
+            pdf_bytes = await asyncio.to_thread(vectorizer_engine.convert_svg_to_pdf, result["svg"])
+            out_filename = f"{basename}_{preset}_{timestamp}.pdf"
+            out_path = PROCESSED_DIR / out_filename
+            with open(out_path, "wb") as f:
+                f.write(pdf_bytes)
+        else:
+            out_filename = f"{basename}_{preset}_{timestamp}.svg"
+            out_path = PROCESSED_DIR / out_filename
+            with open(out_path, "w", encoding="utf-8") as f:
+                f.write(result["svg"])
 
         # Log job history in background
         background_tasks.add_task(log_job_history, user["id"], "vectorizer", file_size, processing_ms)
         # Keep file briefly so /download/{filename} can fetch it.
-        background_tasks.add_task(cleanup_files_later, DOWNLOAD_RETENTION_SECONDS, svg_path)
+        background_tasks.add_task(cleanup_files_later, DOWNLOAD_RETENTION_SECONDS, out_path)
 
         return {
             "status": "success",
-            "filename": svg_filename,
+            "filename": out_filename,
             "preview_bw": result.get("preview_bw"),
             "stats": result.get("stats"),
         }

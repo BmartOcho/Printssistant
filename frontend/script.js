@@ -31,6 +31,25 @@ const cropperCols = document.getElementById('cropper-cols');
 const vectorizerSettings = document.getElementById('tool-settings-vectorizer');
 const vectorizerPreset = document.getElementById('vectorizer-preset');
 
+// Vectorizer result elements
+const vecResult = document.getElementById('vec-result');
+const vecOriginal = document.getElementById('vec-original');
+const vecOutput = document.getElementById('vec-output');
+const vecPaths = document.getElementById('vec-paths');
+const vecPoints = document.getElementById('vec-points');
+const vecColors = document.getElementById('vec-colors');
+const vecTime = document.getElementById('vec-time');
+const vecEngine = document.getElementById('vec-engine');
+const vecWarnings = document.getElementById('vec-warnings');
+const vecDownload = document.getElementById('vec-download');
+const vecResetBtn = document.getElementById('vec-reset');
+const vecAdvancedToggle = document.getElementById('vec-advanced-toggle');
+const vecAdvancedPanel = document.getElementById('vec-advanced-panel');
+const vecSlidersContainer = document.getElementById('vec-sliders');
+const vecOutputFormat = document.getElementById('vec-output-format');
+let vecOriginalDataUrl = null;
+let vecParamsCache = {};
+
 const insertFileZone = document.getElementById('insert-file-zone');
 const insertFileInput = document.getElementById('insert-file-input');
 const insertFileName = document.getElementById('insert-file-name');
@@ -96,6 +115,67 @@ cropperMode.addEventListener('change', () => {
         cropperModeDesc.innerText = 'Specify how many rows and columns to split each page into.';
     }
 });
+
+// ── Vectorizer Advanced Settings ─────────────────────────────────────────────
+vecAdvancedToggle.addEventListener('click', () => {
+    vecAdvancedPanel.classList.toggle('hidden');
+    vecAdvancedToggle.textContent = vecAdvancedPanel.classList.contains('hidden')
+        ? 'Advanced Settings' : 'Hide Advanced';
+});
+
+async function loadVecParams(presetKey) {
+    if (vecParamsCache[presetKey]) {
+        renderVecSliders(vecParamsCache[presetKey]);
+        return;
+    }
+    try {
+        const res = await fetch(`/vectorizer-params?preset=${presetKey}`);
+        if (res.ok) {
+            const params = await res.json();
+            vecParamsCache[presetKey] = params;
+            renderVecSliders(params);
+        }
+    } catch (e) { /* silent — sliders won't show */ }
+}
+
+function renderVecSliders(params) {
+    vecSlidersContainer.innerHTML = '';
+    for (const [key, meta] of Object.entries(params)) {
+        const defaultVal = meta.step % 1 === 0 ? meta.min : meta.min.toFixed(1);
+        const group = document.createElement('div');
+        group.className = 'vec-slider-group';
+        group.innerHTML = `
+            <div class="vec-slider-header">
+                <span class="vec-slider-label">${meta.label}</span>
+                <span class="vec-slider-value" id="vec-val-${key}">default</span>
+            </div>
+            <div class="vec-slider-desc">${meta.description}</div>
+            <input type="range" class="vec-slider-input" id="vec-param-${key}"
+                   min="${meta.min}" max="${meta.max}" step="${meta.step}"
+                   data-key="${key}" data-default="true" />
+        `;
+        vecSlidersContainer.appendChild(group);
+
+        const slider = group.querySelector(`#vec-param-${key}`);
+        const valSpan = group.querySelector(`#vec-val-${key}`);
+        slider.addEventListener('input', () => {
+            slider.dataset.default = 'false';
+            valSpan.textContent = slider.value;
+        });
+    }
+}
+
+function getVecOverrides() {
+    const overrides = {};
+    vecSlidersContainer.querySelectorAll('.vec-slider-input').forEach(slider => {
+        if (slider.dataset.default === 'false') {
+            overrides[slider.dataset.key] = parseFloat(slider.value);
+        }
+    });
+    return Object.keys(overrides).length ? JSON.stringify(overrides) : '';
+}
+
+vectorizerPreset.addEventListener('change', () => loadVecParams(vectorizerPreset.value));
 
 // Tools that require login (free tier)
 const AUTH_REQUIRED_TOOLS = ['duplexer', 'insertbetween', 'cropper'];
@@ -408,6 +488,7 @@ function hideAllPanels() {
     stringResultContainer.classList.add('hidden');
     progressContainer.classList.add('hidden');
     resultContainer.classList.add('hidden');
+    vecResult.classList.add('hidden');
     proUpgradePrompt.classList.add('hidden');
 }
 
@@ -437,6 +518,7 @@ function updateUIForTool() {
         dropTitle.innerText = "Drag & Drop Image";
         dropDesc.innerText = "Upload an image (PNG, JPG) to vectorize";
         fileInput.accept = ".png,.jpg,.jpeg";
+        loadVecParams(vectorizerPreset.value);
     } else if (currentTool === 'evenodd') {
         evenoddSettings.classList.remove('hidden');
     } else if (currentTool === 'swatchset') {
@@ -495,6 +577,15 @@ async function handleUpload(file) {
         return;
     }
 
+    // Capture original image for vectorizer preview
+    if (currentTool === 'vectorizer') {
+        vecOriginalDataUrl = await new Promise(resolve => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.readAsDataURL(file);
+        });
+    }
+
     dropZone.classList.add('hidden');
     duplexerSettings.classList.add('hidden');
     insertSettings.classList.add('hidden');
@@ -526,6 +617,9 @@ async function handleUpload(file) {
     } else if (currentTool === 'vectorizer') {
         formData.append('file', file);
         formData.append('preset', vectorizerPreset.value);
+        formData.append('output_format', vecOutputFormat.value);
+        const ov = getVecOverrides();
+        if (ov) formData.append('overrides', ov);
         endpoint = '/vectorize';
     }
 
@@ -574,8 +668,34 @@ async function handleUpload(file) {
         if (data.status === 'success') {
             setTimeout(() => {
                 progressContainer.classList.add('hidden');
-                resultContainer.classList.remove('hidden');
-                downloadLink.href = `/download/${data.filename}`;
+                if (currentTool === 'vectorizer' && data.preview_bw) {
+                    // Show vectorizer-specific result with preview + stats
+                    vecOriginal.src = vecOriginalDataUrl || '';
+                    vecOutput.src = `data:image/png;base64,${data.preview_bw}`;
+                    vecDownload.href = `/download/${data.filename}`;
+                    vecDownload.textContent = `Download ${data.filename.endsWith('.pdf') ? 'PDF' : 'SVG'}`;
+
+                    const s = data.stats || {};
+                    vecPaths.textContent = (s.path_count ?? '-').toLocaleString();
+                    vecPoints.textContent = (s.point_count ?? '-').toLocaleString();
+                    vecColors.textContent = s.color_count ?? '-';
+                    vecTime.textContent = s.processing_time != null ? `${s.processing_time}s` : '-';
+                    vecEngine.textContent = s.engine ?? '-';
+
+                    // Warnings
+                    const warns = s.warnings || [];
+                    if (warns.length) {
+                        vecWarnings.innerHTML = warns.map(w => `<div>${w}</div>`).join('');
+                        vecWarnings.classList.remove('hidden');
+                    } else {
+                        vecWarnings.classList.add('hidden');
+                    }
+
+                    vecResult.classList.remove('hidden');
+                } else {
+                    resultContainer.classList.remove('hidden');
+                    downloadLink.href = `/download/${data.filename}`;
+                }
             }, 500);
         } else {
             alert('Error: ' + data.message);
@@ -588,6 +708,7 @@ async function handleUpload(file) {
 }
 
 resetBtn.addEventListener('click', resetUI);
+vecResetBtn.addEventListener('click', resetUI);
 
 // ── Swatchset Goal Type Toggle ────────────────────────────────────────────────
 ssGoalRadios.forEach(radio => {
@@ -752,11 +873,13 @@ copyBtn.addEventListener('click', () => {
 // ── Reset UI ──────────────────────────────────────────────────────────────────
 function resetUI() {
     resultContainer.classList.add('hidden');
+    vecResult.classList.add('hidden');
     progressContainer.classList.add('hidden');
     stringResultContainer.classList.add('hidden');
     proUpgradePrompt.classList.add('hidden');
     progressFill.style.width = '0%';
     fileInput.value = '';
+    vecOriginalDataUrl = null;
 
     if (currentTool !== 'evenodd' && currentTool !== 'swatchset') {
         dropZone.classList.remove('hidden');

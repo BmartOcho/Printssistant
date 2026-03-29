@@ -122,7 +122,10 @@ class VectorizerEngine:
 
             current_stage = "svg_validation"
 
-            # 4. Extract stats from SVG
+            # 4. Optimize SVG output
+            svg_content = self._optimize_svg(svg_content)
+
+            # 5. Extract stats from SVG
             stats = self._extract_stats(svg_content)
 
             # 5. Generate warnings and recommendations
@@ -199,14 +202,30 @@ class VectorizerEngine:
     #  Image Preparation
     # ═══════════════════════════════════════════════════════════════════
 
+    # Maximum pixel dimension before auto-downscale
+    MAX_TRACE_DIM = 3000
+
     def _prepare_image(self, image_bytes, config):
-        """Load image, handle alpha compositing, return PNG bytes for engines.
+        """Load image, handle alpha compositing, downscale, preprocess, return PNG bytes.
 
         Returns:
             (png_bytes, has_alpha, content_is_light, width, height)
         """
         img, has_alpha, content_is_light = self._load_image(image_bytes)
         height, width = img.shape[:2]
+
+        # Auto-downscale oversized images to prevent timeout
+        longest = max(width, height)
+        if longest > self.MAX_TRACE_DIM:
+            scale = self.MAX_TRACE_DIM / longest
+            new_w = int(width * scale)
+            new_h = int(height * scale)
+            img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
+            logger.info(f"Downscaled {width}x{height} -> {new_w}x{new_h} for tracing")
+            width, height = new_w, new_h
+
+        # Apply preprocessing pipeline
+        img = self._preprocess_image(img, config)
 
         # Re-encode composited image to PNG bytes for engine consumption
         pil_img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
@@ -257,6 +276,29 @@ class VectorizerEngine:
                 img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
 
         return img, has_alpha, content_is_light
+
+    def _preprocess_image(self, img, config):
+        """Apply optional preprocessing: contrast enhancement, denoising, sharpening."""
+        preprocess = config.get("preprocessing", {})
+        mode = config.get("mode", "bw")
+
+        # Bilateral filter for color mode — smooths noise while preserving edges
+        if mode == "color" and preprocess.get("bilateral", True):
+            img = cv2.bilateralFilter(img, d=9, sigmaColor=75, sigmaSpace=75)
+
+        # CLAHE contrast enhancement for B&W modes
+        if mode == "bw" and preprocess.get("clahe", False):
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            enhanced = clahe.apply(gray)
+            img = cv2.cvtColor(enhanced, cv2.COLOR_GRAY2BGR)
+
+        # Unsharp mask sharpening
+        if preprocess.get("sharpen", False):
+            blurred = cv2.GaussianBlur(img, (0, 0), 3)
+            img = cv2.addWeighted(img, 1.5, blurred, -0.5, 0)
+
+        return img
 
     # ═══════════════════════════════════════════════════════════════════
     #  VTracer Engine (Primary)
@@ -407,6 +449,38 @@ class VectorizerEngine:
         msg += "4. If this persists, contact support with your image file."
 
         return msg
+
+    # Regex to match coordinate numbers with excessive decimal places
+    _COORD_RE = re.compile(r"(\d+\.\d{4,})")
+
+    def _optimize_svg(self, svg_string):
+        """Reduce SVG size: truncate coordinate precision, strip metadata."""
+        try:
+            root = ET.fromstring(svg_string)
+
+            # Remove metadata, title, desc elements
+            for tag in ("metadata", "title", "desc",
+                        "{http://www.w3.org/2000/svg}metadata",
+                        "{http://www.w3.org/2000/svg}title",
+                        "{http://www.w3.org/2000/svg}desc"):
+                for elem in root.findall(f".//{tag}"):
+                    parent = root.find(f".//{tag}/..")
+                    if parent is None:
+                        root.remove(elem)
+                    else:
+                        parent.remove(elem)
+
+            # Truncate excessive coordinate precision in path d attributes
+            for path in list(root.iter()):
+                d = path.get("d")
+                if d:
+                    d_opt = self._COORD_RE.sub(lambda m: f"{float(m.group(1)):.2f}", d)
+                    path.set("d", d_opt)
+
+            return ET.tostring(root, encoding="unicode", xml_declaration=True)
+        except Exception as e:
+            logger.warning(f"SVG optimization failed, returning original: {e}")
+            return svg_string
 
     # ═══════════════════════════════════════════════════════════════════
     #  Image Analysis & Diagnostics
@@ -654,6 +728,16 @@ class VectorizerEngine:
         buf = io.BytesIO()
         pil_img.save(buf, format="PNG", optimize=True)
         return base64.b64encode(buf.getvalue()).decode("utf-8")
+
+    # ═══════════════════════════════════════════════════════════════════
+    #  Format Conversion
+    # ═══════════════════════════════════════════════════════════════════
+
+    def convert_svg_to_pdf(self, svg_string):
+        """Convert SVG string to PDF bytes using cairosvg."""
+        if not HAS_CAIROSVG:
+            raise RuntimeError("PDF output requires cairosvg, which is not available.")
+        return cairosvg.svg2pdf(bytestring=svg_string.encode("utf-8"))
 
     # ═══════════════════════════════════════════════════════════════════
     #  Config
