@@ -54,6 +54,11 @@ DEFAULT_FULL_COLOR = {
     "alpha_handling": {
         "invert": False,
     },
+    "preprocessing": {
+        "bilateral": True,
+        "clahe": False,
+        "sharpen": False,
+    },
     "vtracer": {
         "colormode": "color",
         "hierarchical": "stacked",
@@ -90,6 +95,90 @@ DEFAULT_HIGH_PRECISION_BW = {
         "denoise_strength": 5,
     },
 }
+
+
+# ─── Parameter Metadata (drives frontend sliders + server-side validation) ──
+
+PARAMETER_METADATA = {
+    "filter_speckle": {
+        "label": "Detail Level",
+        "description": "Filter out small artifacts. Lower = more detail, higher = cleaner.",
+        "min": 1, "max": 20, "step": 1,
+        "presets": ["laser_bw", "full_color"],
+        "section": "vtracer",
+    },
+    "corner_threshold": {
+        "label": "Smoothness",
+        "description": "Higher values produce smoother curves with fewer corners.",
+        "min": 10, "max": 120, "step": 5,
+        "presets": ["laser_bw", "full_color"],
+        "section": "vtracer",
+    },
+    "color_precision": {
+        "label": "Color Precision",
+        "description": "Number of significant bits for color quantization. Higher = more colors.",
+        "min": 3, "max": 8, "step": 1,
+        "presets": ["full_color"],
+        "section": "vtracer",
+    },
+    "layer_difference": {
+        "label": "Color Layers",
+        "description": "Threshold for merging similar color layers. Lower = more layers.",
+        "min": 4, "max": 64, "step": 4,
+        "presets": ["full_color"],
+        "section": "vtracer",
+    },
+    "turd_size": {
+        "label": "Noise Filter",
+        "description": "Suppress speckles up to this many pixels. Higher = fewer small artifacts.",
+        "min": 0, "max": 30, "step": 1,
+        "presets": ["high_precision_bw"],
+        "section": "potrace",
+    },
+    "alphamax": {
+        "label": "Corner Sharpness",
+        "description": "Controls corner smoothing. 0 = sharp corners, 1.34 = maximum smoothing.",
+        "min": 0.0, "max": 1.34, "step": 0.1,
+        "presets": ["high_precision_bw"],
+        "section": "potrace",
+    },
+}
+
+
+def get_parameter_metadata(preset_key=None):
+    """Return parameter metadata, optionally filtered by preset key."""
+    if preset_key is None:
+        return PARAMETER_METADATA
+    return {
+        k: v for k, v in PARAMETER_METADATA.items()
+        if preset_key in v["presets"]
+    }
+
+
+def validate_overrides(overrides, preset_key):
+    """Validate and clamp override values against PARAMETER_METADATA.
+
+    Returns a sanitized dict with only whitelisted keys and clamped values,
+    structured as {section: {param: value}} for merge_config compatibility.
+    """
+    allowed = get_parameter_metadata(preset_key)
+    sanitized = {}
+    for key, value in overrides.items():
+        meta = allowed.get(key)
+        if meta is None:
+            continue
+        try:
+            val = float(value)
+        except (TypeError, ValueError):
+            continue
+        # Clamp to range
+        val = max(meta["min"], min(meta["max"], val))
+        # Preserve int type if step is int
+        if isinstance(meta["step"], int):
+            val = int(val)
+        section = meta["section"]
+        sanitized.setdefault(section, {})[key] = val
+    return sanitized
 
 
 def _load_learned():
