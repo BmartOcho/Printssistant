@@ -57,6 +57,10 @@ const insertFileZone = document.getElementById('insert-file-zone');
 const insertFileInput = document.getElementById('insert-file-input');
 const insertFileName = document.getElementById('insert-file-name');
 const intervalInput = document.getElementById('interval-input');
+const blankPageCheck = document.getElementById('blank-page-check');
+const blankPageOptions = document.getElementById('blank-page-options');
+const blankModeRadios = document.querySelectorAll('input[name="blank-mode"]');
+const blankModeDesc = document.getElementById('blank-mode-desc');
 
 const evenoddSettings = document.getElementById('tool-settings-evenodd');
 const evenoddStart = document.getElementById('evenodd-start');
@@ -551,6 +555,22 @@ insertFileZone.addEventListener('drop', (e) => {
     }
 });
 
+// ── Blank Page Toggle ─────────────────────────────────────────────────────────
+blankPageCheck.addEventListener('change', () => {
+    blankPageOptions.classList.toggle('hidden', !blankPageCheck.checked);
+});
+
+blankModeRadios.forEach(radio => {
+    radio.addEventListener('change', () => {
+        const val = document.querySelector('input[name="blank-mode"]:checked').value;
+        if (val === 'interval') {
+            blankModeDesc.innerText = 'Inserts a blank page after every N pages (uses the interval below).';
+        } else if (val === 'cover') {
+            blankModeDesc.innerText = 'Inserts 2 blank pages after the first 2 pages and 2 before the last 2 pages.';
+        }
+    });
+});
+
 // ── Main Drop Zone ────────────────────────────────────────────────────────────
 dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragging'); });
 dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('dragging'); });
@@ -575,8 +595,8 @@ async function handleUpload(file) {
         alert('Please select a PNG or JPG file for vectorization.');
         return;
     }
-    if (currentTool === 'insertbetween' && !insertFile) {
-        alert('Please upload an Insert PDF first!');
+    if (currentTool === 'insertbetween' && !insertFile && !blankPageCheck.checked) {
+        alert('Please upload an Insert PDF or enable Blank Pages!');
         return;
     }
 
@@ -610,8 +630,13 @@ async function handleUpload(file) {
         endpoint = '/upload';
     } else if (currentTool === 'insertbetween') {
         formData.append('base_file', file);
-        formData.append('insert_file', insertFile);
+        if (insertFile) {
+            formData.append('insert_file', insertFile);
+        }
         formData.append('interval', intervalInput.value);
+        if (blankPageCheck.checked) {
+            formData.append('blank_mode', document.querySelector('input[name="blank-mode"]:checked').value);
+        }
         endpoint = '/insert';
     } else if (currentTool === 'cropper') {
         formData.append('file', file);
@@ -912,7 +937,11 @@ function resetUI() {
         ssRefZone.classList.remove('has-file');
         resetBtn.textContent = 'Process Another';
     }
-    if (currentTool === 'insertbetween') insertSettings.classList.remove('hidden');
+    if (currentTool === 'insertbetween') {
+        insertSettings.classList.remove('hidden');
+        blankPageCheck.checked = false;
+        blankPageOptions.classList.add('hidden');
+    }
     if (currentTool === 'cropper') cropperSettings.classList.remove('hidden');
     if (currentTool === 'vectorizer') vectorizerSettings.classList.remove('hidden');
 }

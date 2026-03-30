@@ -150,6 +150,29 @@
             <input type="file" id="insert-file-input" hidden accept=".pdf" />
             <span id="insert-file-name" class="file-name"></span>
           </div>
+
+          <!-- Blank Page Option -->
+          <div class="input-group" style="margin-top: 0.75rem">
+            <label class="swatchset-radio-label" style="cursor: pointer">
+              <input type="checkbox" id="blank-page-check" style="accent-color: var(--primary); cursor: pointer" />
+              Insert Blank Pages
+            </label>
+          </div>
+
+          <div id="blank-page-options" class="hidden">
+            <div class="swatchset-radio-row" style="margin-top: 0.5rem">
+              <label class="swatchset-radio-label">
+                <input type="radio" name="blank-mode" value="interval" checked /> Every N Pages
+              </label>
+              <label class="swatchset-radio-label">
+                <input type="radio" name="blank-mode" value="cover" /> Front/Back Cover
+              </label>
+            </div>
+            <p id="blank-mode-desc" class="settings-desc">
+              Inserts a blank page after every N pages (uses the interval below).
+            </p>
+          </div>
+
           <div class="input-group">
             <label for="interval-input">Interval (Pages)</label>
             <input type="number" id="interval-input" value="1" min="1" class="glass-input" />

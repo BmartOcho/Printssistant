@@ -1055,11 +1055,21 @@ async def crop_pdf(
 async def insert_pdf(
     background_tasks: BackgroundTasks,
     base_file: UploadFile = File(...),
-    insert_file: UploadFile = File(...),
+    insert_file: Optional[UploadFile] = File(None),
     interval: int = Form(..., ge=1),
+    blank_mode: Optional[str] = Form(None),
     user: dict = Depends(check_free_limit),
 ):
     import time
+
+    # Validate: must have at least one insertion source
+    has_insert_file = insert_file is not None and insert_file.filename
+    if not has_insert_file and not blank_mode:
+        raise HTTPException(status_code=400, detail="Provide an insert PDF or enable blank page mode.")
+
+    if blank_mode and blank_mode not in ("interval", "cover"):
+        raise HTTPException(status_code=400, detail="Invalid blank_mode. Use 'interval' or 'cover'.")
+
     # Read and validate base file size
     base_content = await base_file.read()
     if len(base_content) > MAX_PDF_SIZE:
@@ -1068,42 +1078,45 @@ async def insert_pdf(
             detail=f"Base file too large. Maximum size is {MAX_PDF_SIZE // (1024*1024)} MB."
         )
 
-    # Read and validate insert file size
-    insert_content = await insert_file.read()
-    if len(insert_content) > MAX_PDF_SIZE:
-        raise HTTPException(
-            status_code=413,
-            detail=f"Insert file too large. Maximum size is {MAX_PDF_SIZE // (1024*1024)} MB."
-        )
-
     base_path = UPLOAD_DIR / Path(base_file.filename).name
     with open(base_path, "wb") as buffer:
         buffer.write(base_content)
 
-    insert_path = UPLOAD_DIR / Path(insert_file.filename).name
-    with open(insert_path, "wb") as buffer:
-        buffer.write(insert_content)
+    # Read and validate insert file if provided
+    insert_path = None
+    total_file_size = len(base_content)
+    if has_insert_file:
+        insert_content = await insert_file.read()
+        if len(insert_content) > MAX_PDF_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Insert file too large. Maximum size is {MAX_PDF_SIZE // (1024*1024)} MB."
+            )
+        insert_path = UPLOAD_DIR / Path(insert_file.filename).name
+        with open(insert_path, "wb") as buffer:
+            buffer.write(insert_content)
+        total_file_size += len(insert_content)
 
     output_filename = f"inserted_{Path(base_file.filename).name}"
     output_path = PROCESSED_DIR / output_filename
 
-    total_file_size = len(base_content) + len(insert_content)
     start_time = time.time()
-    success = await asyncio.to_thread(insert_pages, base_path, insert_path, output_path, interval=interval, positions=[])
+    success = await asyncio.to_thread(
+        insert_pages, base_path, insert_path, output_path,
+        interval=interval, positions=[], blank_mode=blank_mode,
+    )
     processing_ms = int((time.time() - start_time) * 1000)
+
+    cleanup_paths = [p for p in [base_path, insert_path] if p]
 
     if success:
         increment_job_count(user["id"])
-        # Log job history in background
         background_tasks.add_task(log_job_history, user["id"], "insert", total_file_size, processing_ms)
-        # Clean up original upload files after response
-        background_tasks.add_task(cleanup_files, base_path, insert_path)
-        # Keep processed file briefly so /download/{filename} can fetch it.
+        background_tasks.add_task(cleanup_files, *cleanup_paths)
         background_tasks.add_task(cleanup_files_later, DOWNLOAD_RETENTION_SECONDS, output_path)
         return {"status": "success", "filename": output_filename}
     else:
-        # Clean up on error too
-        background_tasks.add_task(cleanup_files, base_path, insert_path)
+        background_tasks.add_task(cleanup_files, *cleanup_paths)
         return {"status": "error", "message": "Failed to process PDF"}
 
 
